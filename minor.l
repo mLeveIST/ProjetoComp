@@ -17,56 +17,56 @@ int binaryInt(char *s);
 
 %%
 
-<IN_COM>.|\n        ;
-<IN_COM>\$          BEGIN 0;
+<IN_COM>.|\n              ;
+<IN_COM>\$                BEGIN 0;
 
-\$\$.*              ;               /* Line comment */
-\$                  BEGIN IN_COM;   /* Block comment */
+\$\$.*                    ;               /* Line comment */
+\$                        BEGIN IN_COM;   /* Block comment */
 
-"program"           return PROG;
-"module"            return MODL;
-"start"             return START;
-"end"               return END;
-"void"              return VOID;
-"const"             return CONST;
-"number"            return IDNUM;
-"array"             return IDVEC;
-"string"            return IDSTR;
-"function"          return FUNC;
-"public"            return PUBL;
-"forward"           return FRWD;
-"if"                return IF;
-"then"              return THEN;
-"elif"              return ELIF;
-"else"              return ELSE;
-"fi"                return FI;
-"for"               return FOR;
-"until"             return UNTIL;
-"step"              return STEP;
-"do"                return DO;
-"repeat"            return REP;
-"stop"              return STOP;
-"done"              return DONE;
-"return"            return RETN;
+"program"                 return PROG;
+"module"                  return MODL;
+"start"                   return START;
+"end"                     return END;
+"void"                    return VOID;
+"const"                   return CONST;
+"number"                  return IDNUM;
+"array"                   return IDVEC;
+"string"                  return IDSTR;
+"function"                return FUNC;
+"public"                  return PUBL;
+"forward"                 return FRWD;
+"if"                      return IF;
+"then"                    return THEN;
+"elif"                    return ELIF;
+"else"                    return ELSE;
+"fi"                      return FI;
+"for"                     return FOR;
+"until"                   return UNTIL;
+"step"                    return STEP;
+"do"                      return DO;
+"repeat"                  return REP;
+"stop"                    return STOP;
+"done"                    return DONE;
+"return"                  return RETN;
 
-[A-Za-z][A-Za-z0-9_]*         { yylval.s = dupstr(yytext); return ID; }
+[A-Za-z][A-Za-z0-9_]*     { yylval.s = dupstr(yytext); return ID; }
 
-0|[1-9][0-9]*       { yylval.i = decimalInt(yytext); return NUM }
-0[0-7]+             { yylval.i = octalInt(yytext + 1); return NUM }
-0x[0-9A-Fa-f]+      { yylval.i = hexadecimalInt(yytext + 2); return NUM }
-0b(0|1)+            { yylval.i = binaryInt(yytext + 2); return NUM }
+0|[1-9][0-9]*             { yylval.i = decimalInt(yytext); return NUM; }
+0[0-7]+                   { yylval.i = octalInt(yytext + 1); return NUM; }
+0x[0-9A-Fa-f]+            { yylval.i = hexadecimalInt(yytext + 2); return NUM; }
+0b(0|1)+                  { yylval.i = binaryInt(yytext + 2); return NUM; }
 
-[ \n\t\r]+          ;
+[ \n\t\r]+                ;
 
-.                   yyerror("ERROR : Unknown character!");
+.                         yyerror("ERROR : Unknown character!");
 
 %%
 int yywrap()
 {
-  if (YYSTATE == COM)
+  if (YYSTATE == IN_COM)
     yyerror("ERROR : Unterminated comment!");
-  /*if (YYSTATE == STR)
-    yyerror("ERROR : Unterminated string!");*/
+  if (YYSTATE == IN_STR)
+    yyerror("ERROR : Unterminated string!");
   return 1;
 }
 char *getyytext() { return yytext; }
