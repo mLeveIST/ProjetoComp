@@ -7,26 +7,36 @@
 char *dupstr(const char *s);
 extern void yyerror(const char *msg);
 
-int decimalInt(char *s);
-int octalInt(char *s);
-int hexadecimalInt(char *s);
-int binaryInt(char *s);
+char *convert_hexa(char *s);
+int parse_char(char *s);
+int parse_decimal(char *s);
+int parse_octal(char *s);
+int parse_hexa(char *s);
+int parse_binary(char *s);
 %}
 
-%x IN_COM IN_STR
+%x IN_CODE IN_COM IN_STR
+
+HEXDIG [0-9A-Fa-f]
+WSP [ \n\t\r]
 
 %%
 
+^program                  { BEGIN IN_CODE; return PROG; }
+^module                   { BEGIN IN_CODE; return MODL; }
+
+.|\n                      ;
+
+<IN_COM>\$                BEGIN IN_CODE;
 <IN_COM>.|\n              ;
-<IN_COM>\$                BEGIN 0;
+
+<IN_CODE> {
 
 \$\$.*                    ;               /* Line comment */
 \$                        BEGIN IN_COM;   /* Block comment */
 
-"program"                 return PROG;
-"module"                  return MODL;
-"start"                   return START;
-"end"                     return END;
+^end                      { BEGIN INITIAL; return END; }
+^start                    return START;
 "void"                    return VOID;
 "const"                   return CONS;
 "number"                  return IDNUM;
@@ -49,20 +59,49 @@ int binaryInt(char *s);
 "done"                    return DONE;
 "return"                  return RETN;
 
+":="                      return ASSOC;
+"<="                      return LE;
+">="                      return GE;
+"~="                      return NE;
+
 [A-Za-z][A-Za-z0-9_]*     { yylval.s = dupstr(yytext); return ID; }
 
-0|[1-9][0-9]*             { yylval.i = decimalInt(yytext); return NUM; }
-0[0-7]+                   { yylval.i = octalInt(yytext + 1); return NUM; }
-0x[0-9A-Fa-f]+            { yylval.i = hexadecimalInt(yytext + 2); return NUM; }
-0b(0|1)+                  { yylval.i = binaryInt(yytext + 2); return NUM; }
+\'([^\\']|\\[ntr'\\])?\'  { yytext[yyleng-1] = '\0'; yylval.i = parse_char(yytext + 1); return CHA; }
+\'\\{HEXDIG}{1,2}\'       { yytext[yyleng-1] = '\0'; yylval.i = parse_hexa(yytext + 1); return CHA; }
 
-[ \n\t\r]+                ;
+\"                        BEGIN IN_STR;
+
+0|[1-9][0-9]*             { yylval.i = parse_decimal(yytext); return NUM; }
+0[0-7]+                   { yylval.i = parse_octal(yytext + 1); return NUM; }
+0x{HEXDIG}+               { yylval.i = parse_hexa(yytext + 2); return NUM; }
+0b(0|1)+                  { yylval.i = parse_binary(yytext + 2); return NUM; }
+
+[-+/%*^<>=|&~?#\[\]();!,] return *yytext;
+
+{WPS}+                    ;
 
 .                         yyerror("ERROR : Unknown character!");
+
+}
+
+<IN_STR> {
+
+\"                        { BEGIN IN_CODE; return STR; }
+\\n                       strcat(yylval.s, "\n");
+\\t                       strcat(yylval.s, "\t");
+\\r                       strcat(yylval.s, "\r");
+\\[\\"]                   strcat(yylval.s, yytext + 1);
+\\{HEXDIG}{1,2}           strcat(yylval.s, convert_hexa(yytext + 1));
+\\*                       yyerror("ERROR : Invalid escape sequence in string literal!");
+.|\n                      strcat(yylval.s, yytext);
+
+}
 
 %%
 int yywrap()
 {
+  if (YYSTATE == IN_CODE)
+    yyerror("ERROR : Unterminated code region!");
   if (YYSTATE == IN_COM)
     yyerror("ERROR : Unterminated comment!");
   if (YYSTATE == IN_STR)
@@ -71,7 +110,40 @@ int yywrap()
 }
 char *getyytext() { return yytext; }
 
-int decimalInt(char *s)
+char *convert_hexa(char *s)
+{
+  char c[2];
+
+  c[0] = parse_hexa(s);
+  c[1] = '\0';
+
+  return c;
+}
+
+int parse_char(char *s)
+{
+  if (strlen(s) == 0)
+    return 0;
+
+  if (strlen(s) == 1 && s[0] != '\\' && s[0] != '\'') {
+    return s[0];
+  } else if (strlen(s) == 2 && s[0] == '\\') {
+    switch (s[1]) {
+      case 'n': return '\n';
+      case 't': return '\t';
+      case 'r': return '\r';
+      case '\'': return '\'';
+      case '\\': return '\\';
+      default: yyerror("ERROR : Invalid character escape sequence!"); break;
+    }
+  } else
+    /* ERROR in use of function */
+    yyerror("ERROR : Invalid character sequence!");
+
+  return 0;
+}
+
+int parse_decimal(char *s)
 {
   errno = 0;
   int num = strtol(s, 0, 0);
@@ -82,7 +154,7 @@ int decimalInt(char *s)
   return num;
 }
 
-int octalInt(char *s)
+int parse_octal(char *s)
 {
   int i, num = 0, aux = 0;
 
@@ -91,6 +163,7 @@ int octalInt(char *s)
       aux = aux * 8 + s[i] - '0';
     else
       /* ERROR in use of function */
+      yyerror("ERROR : Invalid octal number!");
 
     if (aux < num) {
       yyerror("ERROR : Overflow in octal number!");
@@ -101,7 +174,7 @@ int octalInt(char *s)
   return num;
 }
 
-int hexadecimalInt(char *s)
+int parse_hexa(char *s)
 {
   int i, num = 0, aux = 0;
 
@@ -114,6 +187,7 @@ int hexadecimalInt(char *s)
       aux = aux * 16 + 10 + s[i] - 'a';
     else
       /* ERROR in use of function */
+      yyerror("ERROR : Invalid hexadecimal number!");
 
     if (aux < num) {
       yyerror("ERROR : Overflow in hexadecimal number!");
@@ -124,7 +198,7 @@ int hexadecimalInt(char *s)
   return num;
 }
 
-int binaryInt(char *s)
+int parse_binary(char *s)
 {
   int i, num = 0, aux = 0;
 
@@ -133,6 +207,7 @@ int binaryInt(char *s)
       aux = aux * 2 + s[i] - '0';
     else
       /* ERROR in use of function */
+      yyerror("ERROR : Invalid binary number!");
 
     if (aux < num) {
       yyerror("ERROR : Overflow in binary number!");

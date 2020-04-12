@@ -20,9 +20,23 @@ int yylex(), yyerror(char *s), yyparse();
 %token IF THEN ELIF ELSE FI
 %token FOR UNTIL STEP DO REP STOP DONE
 
-%token <i> NUM
+%token <i> NUM CHA
 %token <v> VEC
 %token <s> ID STR
+
+%nonassoc ELSE
+%right IF ELIF
+%right ASSOC
+%left '|'
+%left '&'
+%nonassoc '~'
+%left '=' NE
+%left '<' '>' LE GE
+%left '+' '-'
+%left '*' '/' '%'
+%right '^'
+%nonassoc '?' UMINUS ADDR
+%nonassoc '(' '['
 
 %%
 
@@ -83,52 +97,89 @@ type : IDNUM
      ;
 
 oplits :
-       | lits1
-       | lits2
+       | lits
+       | nlist
        ;
 
-lits1 : lit
-      | lits1 ',' lit
-      ;
-
-lits2 : lit
-      | lits2 ',' lit
-      ;
+lits : lit
+     | lits lit
+     ;
 
 lit : NUM
+    | CHA
     | STR
-    | VEC
     ;
 
-body : bvars inst
+nlist : NUM
+      | nlist ',' NUM
+      ;
+
+body : bvars insts
      ;
 
 bvars :
       | bvars var ';'
       ;
 
-inst : 
-     | IF expr THEN inst elifs FI
-     | IF expr THEN inst elifs ELSE inst FI
-     | FOR expr UNTIL expr STEP expr DO inst DONE
+insts :
+      | inst
+      ;
+
+inst : IF expr THEN insts elifs FI
+     | IF expr THEN insts elifs ELSE insts FI
+     | FOR expr UNTIL expr STEP expr DO insts DONE
      | expr ';'
      | expr '!'
      | REP
      | STOP
-     | RETN
-     | RETN expr
+     | RETN opexpr
      | leftv '#' expr ';'
      ;
 
 elifs :
-      | elifs ELIF expr THEN inst
+      | elifs ELIF expr THEN insts
       ;
 
-expr : 'e'
+opexpr :
+       | expr
+       ;
 
-leftv : 'l'
+expr : leftv
+     | lits
+     | '(' expr ')'
+     | ID '(' args ')'
+     | ID '(' args ')' '[' expr ']'
+     | expr '?'
+     | '&' leftv %prec ADDR
+     | '-' expr %prec UMINUS
+     | expr '^' expr
+     | expr '*' expr
+     | expr '/' expr
+     | expr '%' expr
+     | expr '+' expr
+     | expr '-' expr
+     | expr '<' expr
+     | expr '>' expr
+     | expr LE expr
+     | expr GE expr
+     | expr '=' expr
+     | expr NE expr
+     | expr '~' expr
+     | expr '&' expr
+     | expr '|' expr
+     | leftv ASSOC expr
+     ;
+
+leftv : ID
+      | ID '[' expr ']'
+      ;
+
+args : expr
+     | args ',' expr
+     ;
 
 %%
+
 char **yynames =
 #if YYDEBUG > 0
   (char**)yyname;
