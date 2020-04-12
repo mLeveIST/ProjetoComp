@@ -18,5 +18,5 @@ extern void yyerror(const char *msg);
 .                   yyerror("ERROR : Unknown character!");
 
 %%
-int main() { return yylex(); }
 int yywrap() { return 1; }
+char *getyytext() { return yytext; }

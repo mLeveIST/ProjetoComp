@@ -2,7 +2,7 @@ minor: minor.y minor.l
 	make -C lib
 	byacc -dv minor.y
 	flex -dl minor.l
-	gcc -Ilib lib/libutil.a lex.yy.c y.tab.c
+	gcc lex.yy.c y.tab.c -Ilib lib/libutil.a
 
 clean::
 	make -C lib clean
