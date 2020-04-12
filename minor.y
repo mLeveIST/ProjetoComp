@@ -8,7 +8,19 @@
 int yylex(), yyerror(char *s), yyparse();
 %}
 
-%token PROG MODL STRT END
+&union {
+  int i;
+  char *s;
+}
+
+%token PROG MODL START END
+%token VOID CONST IDNUM IDVEC IDSTR
+%token FUNC PUBL FRWD RETN
+%token IF THEN ELIF ELSE FI
+%token FOR UNTIL STEP DO REP STOP DONE
+
+%token <i> NUM
+%token <s> ID
 
 %%
 

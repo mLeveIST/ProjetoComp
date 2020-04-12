@@ -1,4 +1,5 @@
 %{
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include "y.tab.h"
@@ -36,16 +37,16 @@ int binaryInt(char *s);
 "forward"           return FRWD;
 "if"                return IF;
 "then"              return THEN;
-"else"              return ELSE;
 "elif"              return ELIF;
+"else"              return ELSE;
 "fi"                return FI;
 "for"               return FOR;
 "until"             return UNTIL;
 "step"              return STEP;
 "do"                return DO;
-"done"              return DONE;
 "repeat"            return REP;
 "stop"              return STOP;
+"done"              return DONE;
 "return"            return RETN;
 
 [A-Za-z][A-Za-z0-9_]*         { yylval.s = dupstr(yytext); return ID; }
