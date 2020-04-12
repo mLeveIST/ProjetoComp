@@ -16,3 +16,9 @@ S :
   ;
 
 %%
+char **yynames =
+#if YYDEBUG > 0
+		 (char**)yyname;
+#else
+		 0;
+#endif
