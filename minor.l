@@ -78,7 +78,7 @@ WSP [ \n\t\r]
 
 [-+/%*^<>=|&~?#\[\]();!,] return *yytext;
 
-{WPS}+                    ;
+{WSP}+                    ;
 
 .                         yyerror("ERROR : Unknown character!");
 
