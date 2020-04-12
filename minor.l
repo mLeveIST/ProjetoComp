@@ -28,7 +28,7 @@ int binaryInt(char *s);
 "start"                   return START;
 "end"                     return END;
 "void"                    return VOID;
-"const"                   return CONST;
+"const"                   return CONS;
 "number"                  return IDNUM;
 "array"                   return IDVEC;
 "string"                  return IDSTR;
