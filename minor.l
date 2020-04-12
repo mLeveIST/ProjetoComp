@@ -30,7 +30,7 @@ WSP [ \n\t\r]
 <IN_COM>\$                BEGIN IN_CODE;
 <IN_COM>.|\n              ;
 
-<IN_CODE> {
+<IN_CODE>{
 
 \$\$.*                    ;               /* Line comment */
 \$                        BEGIN IN_COM;   /* Block comment */
@@ -84,7 +84,7 @@ WSP [ \n\t\r]
 
 }
 
-<IN_STR> {
+<IN_STR>{
 
 \"                        { BEGIN IN_CODE; return STR; }
 \\n                       strcat(yylval.s, "\n");
