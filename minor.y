@@ -157,7 +157,7 @@ expr : leftv
      | expr GE expr
      | expr '=' expr
      | expr NE expr
-     | expr '~' expr
+     | '~' expr
      | expr '&' expr
      | expr '|' expr
      | leftv ASSOC expr
