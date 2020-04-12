@@ -14,7 +14,7 @@ int yylex(), yyerror(char *s), yyparse();
 }
 
 %token PROG MODL START END
-%token VOID CONST IDNUM IDVEC IDSTR
+%token VOID CONS IDNUM IDVEC IDSTR
 %token FUNC PUBL FRWD RETN
 %token IF THEN ELIF ELSE FI
 %token FOR UNTIL STEP DO REP STOP DONE

@@ -112,12 +112,9 @@ char *getyytext() { return yytext; }
 
 char *convert_hexa(char *s)
 {
-  char c[2];
-
-  c[0] = parse_hexa(s);
-  c[1] = '\0';
-
-  return c;
+  s[0] = parse_hexa(s);
+  s[1] = '\0';
+  return s;
 }
 
 int parse_char(char *s)
