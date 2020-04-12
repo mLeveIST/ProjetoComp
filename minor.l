@@ -65,8 +65,8 @@ int yywrap()
 {
   if (YYSTATE == COM)
     yyerror("ERROR : Unterminated comment!");
-  if (YYSTATE == STR)
-    yyerror("ERROR : Unterminated string!");
+  /*if (YYSTATE == STR)
+    yyerror("ERROR : Unterminated string!");*/
   return 1;
 }
 char *getyytext() { return yytext; }

@@ -8,7 +8,7 @@
 int yylex(), yyerror(char *s), yyparse();
 %}
 
-&union {
+%union {
   int i;
   char *s;
 }
