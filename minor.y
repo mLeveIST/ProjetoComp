@@ -10,7 +10,6 @@ int yylex(), yyerror(char *s), yyparse();
 
 %union {
   int i;
-  int *v;
   char *s;
 }
 
@@ -21,7 +20,6 @@ int yylex(), yyerror(char *s), yyparse();
 %token FOR UNTIL STEP DO REP STOP DONE
 
 %token <i> NUM CHA
-%token <v> VEC
 %token <s> ID STR
 
 %nonassoc ELSE
@@ -60,7 +58,7 @@ decls : decl
 
 decl : func
      | qualf cons var
-     | qualf cons var ASSOC oplits
+     | qualf cons var ASSOC lits
      ;
 
 func : FUNC qualf types ID opvars DONE
@@ -96,23 +94,18 @@ type : IDNUM
      | IDVEC
      ;
 
-oplits :
-       | lits
-       | nlist
-       ;
-
-lits : lit
-     | lits lit
+lits : lits ',' NUM
+     | exprlit
      ;
+
+exprlit : lit
+        | exprlit lit
+        ;
 
 lit : NUM
     | CHA
     | STR
     ;
-
-nlist : NUM
-      | nlist ',' NUM
-      ;
 
 body : bvars insts
      ;
@@ -145,7 +138,7 @@ opexpr :
        ;
 
 expr : leftv
-     | lits
+     | exprlit
      | '(' expr ')'
      | ID '(' args ')'
      | ID '(' args ')' '[' expr ']'
