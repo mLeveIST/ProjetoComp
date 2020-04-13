@@ -22,8 +22,6 @@ int yylex(), yyerror(char *s), yyparse();
 %token <i> NUM CHA
 %token <s> ID STR
 
-%nonassoc ELSE
-%right IF ELIF
 %right ASSOC
 %left '|'
 %left '&'
@@ -95,12 +93,12 @@ type : IDNUM
      ;
 
 lits : lits ',' NUM
-     | exprlit
+     | litexp
      ;
 
-exprlit : lit
-        | exprlit lit
-        ;
+litexp : lit
+       | litexp lit
+       ;
 
 lit : NUM
     | CHA
@@ -118,33 +116,35 @@ insts :
       | insts inst
       ;
 
-inst : IF expr THEN insts elifs FI
-     | IF expr THEN insts elifs ELSE insts FI
-     | FOR expr UNTIL expr STEP expr DO insts DONE
+inst : IF expr THEN block elifs FI
+     | IF expr THEN block elifs ELSE block FI
+     | FOR expr UNTIL expr STEP expr DO block DONE
      | expr ';'
      | expr '!'
      | REP
      | STOP
-     | RETN opexpr
      | leftv '#' expr ';'
      ;
 
 elifs :
-      | elifs ELIF expr THEN insts
+      | elifs ELIF expr THEN block
       ;
 
-opexpr :
-       | expr
-       ;
+block : insts retn
+      ;
+
+retn : 
+     | RETN
+     | RETN expr
 
 expr : leftv
-     | exprlit
+     | litexp
      | '(' expr ')'
-     | ID '(' args ')'
-     | ID '(' args ')' '[' expr ']'
+     | expr '(' args ')'
+     | expr '(' args ')' '[' expr ']'
      | '?'
-     | '&' leftv %prec ADDR
-     | '-' expr %prec UMINUS
+     | '&' leftv %prec ADDR 
+     | '-' expr %prec UMINUS 
      | expr '^' expr
      | expr '*' expr
      | expr '/' expr
