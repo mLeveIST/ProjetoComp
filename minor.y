@@ -142,7 +142,7 @@ expr : leftv
      | '(' expr ')'
      | ID '(' args ')'
      | ID '(' args ')' '[' expr ']'
-     | expr '?'
+     | '?'
      | '&' leftv %prec ADDR
      | '-' expr %prec UMINUS
      | expr '^' expr
