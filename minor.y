@@ -115,7 +115,7 @@ bvars :
       ;
 
 insts :
-      | inst
+      | insts inst
       ;
 
 inst : IF expr THEN insts elifs FI
