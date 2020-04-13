@@ -15,85 +15,90 @@ int parse_hexa(char *s);
 int parse_binary(char *s);
 %}
 
+%option debug
+
 %x IN_CODE IN_COM IN_STR
 
 HEXDIG [0-9A-Fa-f]
+HEXCHA \\{HEXDIG}{1,2}
 WSP [ \n\t\r]
 
 %%
 
-^program                  { BEGIN IN_CODE; return PROG; }
-^module                   { BEGIN IN_CODE; return MODL; }
+^program                   { BEGIN IN_CODE; return PROG; }
+^module                    { BEGIN IN_CODE; return MODL; }
 
-.|\n                      ;
+.|\n                       ;
 
-<IN_COM>\$                BEGIN IN_CODE;
-<IN_COM>.|\n              ;
+<IN_COM>\$                 BEGIN IN_CODE;
+<IN_COM>.|\n               ;
 
 <IN_CODE>{
 
-\$\$.*                    ;               /* Line comment */
-\$                        BEGIN IN_COM;   /* Block comment */
+\$\$.*                     ;               /* Line comment */
+\$                         BEGIN IN_COM;   /* Block comment */
 
-^end                      { BEGIN INITIAL; return END; }
-^start                    return START;
-"void"                    return VOID;
-"const"                   return CONS;
-"number"                  return IDNUM;
-"array"                   return IDVEC;
-"string"                  return IDSTR;
-"function"                return FUNC;
-"public"                  return PUBL;
-"forward"                 return FRWD;
-"if"                      return IF;
-"then"                    return THEN;
-"elif"                    return ELIF;
-"else"                    return ELSE;
-"fi"                      return FI;
-"for"                     return FOR;
-"until"                   return UNTIL;
-"step"                    return STEP;
-"do"                      return DO;
-"repeat"                  return REP;
-"stop"                    return STOP;
-"done"                    return DONE;
-"return"                  return RETN;
+^end                       { BEGIN INITIAL; return END; }
+^start                     return START;
+"void"                     return VOID;
+"const"                    return CONS;
+"number"                   return IDNUM;
+"array"                    return IDVEC;
+"string"                   return IDSTR;
+"function"                 return FUNC;
+"public"                   return PUBL;
+"forward"                  return FRWD;
+"if"                       return IF;
+"then"                     return THEN;
+"elif"                     return ELIF;
+"else"                     return ELSE;
+"fi"                       return FI;
+"for"                      return FOR;
+"until"                    return UNTIL;
+"step"                     return STEP;
+"do"                       return DO;
+"repeat"                   return REP;
+"stop"                     return STOP;
+"done"                     return DONE;
+"return"                   return RETN;
 
-":="                      return ASSOC;
-"<="                      return LE;
-">="                      return GE;
-"~="                      return NE;
+":="                       return ASSOC;
+"<="                       return LE;
+">="                       return GE;
+"~="                       return NE;
 
-[A-Za-z][A-Za-z0-9_]*     { yylval.s = dupstr(yytext); return ID; }
+[A-Za-z][A-Za-z0-9_]*      { yylval.s = dupstr(yytext); return ID; }
 
-\'([^\\']|\\[ntr'\\])?\'  { yytext[yyleng-1] = '\0'; yylval.i = parse_char(yytext + 1); return CHA; }
-\'\\{HEXDIG}{1,2}\'       { yytext[yyleng-1] = '\0'; yylval.i = parse_hexa(yytext + 1); return CHA; }
+\'([^'\\]|\\[ntr'\\])?\'   { yytext[yyleng-1] = '\0'; yylval.i = parse_char(yytext + 1); return CHA; }
+\'\\{HEXDIG}{1,2}\'        { yytext[yyleng-1] = '\0'; yylval.i = parse_hexa(yytext + 1); return CHA; }
 
-\"                        BEGIN IN_STR;
+\"([^"\\]|\\[ntr"\\]|\\{HEXDIG}{1,2})*\"  { yylval.s = malloc(yyleng); *yylval.s = 0; REJECT; }
 
-0|[1-9][0-9]*             { yylval.i = parse_decimal(yytext); return NUM; }
-0[0-7]+                   { yylval.i = parse_octal(yytext + 1); return NUM; }
-0x{HEXDIG}+               { yylval.i = parse_hexa(yytext + 2); return NUM; }
-0b(0|1)+                  { yylval.i = parse_binary(yytext + 2); return NUM; }
+\"                         BEGIN IN_STR;
 
-[-+/%*^<>=|&~?#\[\]();!,] return *yytext;
+0|[1-9][0-9]*              { yylval.i = parse_decimal(yytext); return NUM; }
+0[0-7]+                    { yylval.i = parse_octal(yytext + 1); return NUM; }
+0x{HEXDIG}+                { yylval.i = parse_hexa(yytext + 2); return NUM; }
+0b(0|1)+                   { yylval.i = parse_binary(yytext + 2); return NUM; }
 
-{WSP}+                    ;
+[-+/%*^<>=|&~?#\[\]();!,]  return *yytext;
 
-.                         yyerror("ERROR : Unknown character!");
+{WSP}+                     ;
+
+.                          yyerror("ERROR : Unknown character!");
 
 }
 
 <IN_STR>{
 
-\"                        { BEGIN IN_CODE; return STR; }
-\\n                       strcat(yylval.s, "\n");
-\\t                       strcat(yylval.s, "\t");
-\\r                       strcat(yylval.s, "\r");
-\\[\\"]                   strcat(yylval.s, yytext + 1);
-\\{HEXDIG}{1,2}           strcat(yylval.s, convert_hexa(yytext + 1));
-\\*                       yyerror("ERROR : Invalid escape sequence in string literal!");
-.|\n                      strcat(yylval.s, yytext);
+\"                         { BEGIN IN_CODE; return STR; }
+\\n                        strcat(yylval.s, "\n");
+\\t                        strcat(yylval.s, "\t");
+\\r                        strcat(yylval.s, "\r");
+\\[\\"]                    strcat(yylval.s, yytext + 1);
+\\{HEXDIG}{1,2}            strcat(yylval.s, convert_hexa(yytext + 1));
+\\*                        yyerror("ERROR : Invalid escape sequence in string literal!");
+.|\n                       strcat(yylval.s, yytext);
 
 }
 
