@@ -1,5 +1,6 @@
 %{
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "y.tab.h"
@@ -20,7 +21,7 @@ int parse_binary(char *s);
 %x IN_CODE IN_COM IN_STR
 
 HEXDIG [0-9A-Fa-f]
-HEXCHA \\{HEXDIG}{1,2}
+HEXCHA \\{HEXDIG}{HEXDIG}?
 WSP [ \n\t\r]
 
 %%
@@ -39,7 +40,7 @@ WSP [ \n\t\r]
 \$                         BEGIN IN_COM;   /* Block comment */
 
 ^end                       { BEGIN INITIAL; return END; }
-^start                     return START;
+"start"                    return START;
 "void"                     return VOID;
 "const"                    return CONS;
 "number"                   return IDNUM;
@@ -70,10 +71,10 @@ WSP [ \n\t\r]
 [A-Za-z][A-Za-z0-9_]*      { yylval.s = dupstr(yytext); return ID; }
 
 \'([^'\\]|\\[ntr'\\])?\'   { yytext[yyleng-1] = '\0'; yylval.i = parse_char(yytext + 1); return CHA; }
-\'\\{HEXDIG}{1,2}\'        { yytext[yyleng-1] = '\0'; yylval.i = parse_hexa(yytext + 1); return CHA; }
+  /* \'\\0\'                    { yylval.i = '\0'; return CHA; } */
+\'{HEXCHA}\'               { yytext[yyleng-1] = '\0'; yylval.i = parse_hexa(yytext + 2); return CHA; }
 
-\"([^"\\]|\\[ntr"\\]|\\{HEXDIG}{1,2})*\"  { yylval.s = malloc(yyleng); *yylval.s = 0; REJECT; }
-
+\"([^"\\]|\\[ntr0"\\]|{HEXCHA})*\"  { yylval.s = malloc(yyleng); *yylval.s = 0; REJECT; }
 \"                         BEGIN IN_STR;
 
 0|[1-9][0-9]*              { yylval.i = parse_decimal(yytext); return NUM; }
@@ -84,7 +85,6 @@ WSP [ \n\t\r]
 [-+/%*^<>=|&~?#\[\]();!,]  return *yytext;
 
 {WSP}+                     ;
-
 .                          yyerror("ERROR : Unknown character!");
 
 }
@@ -95,8 +95,9 @@ WSP [ \n\t\r]
 \\n                        strcat(yylval.s, "\n");
 \\t                        strcat(yylval.s, "\t");
 \\r                        strcat(yylval.s, "\r");
+  /* \\0/[^0-9A-Fa-f]           strcat(yylval.s, "\0"); */
 \\[\\"]                    strcat(yylval.s, yytext + 1);
-\\{HEXDIG}{1,2}            strcat(yylval.s, convert_hexa(yytext + 1));
+{HEXCHA}                   strcat(yylval.s, convert_hexa(yytext + 1));
 \\*                        yyerror("ERROR : Invalid escape sequence in string literal!");
 .|\n                       strcat(yylval.s, yytext);
 
@@ -134,6 +135,7 @@ int parse_char(char *s)
       case 'n': return '\n';
       case 't': return '\t';
       case 'r': return '\r';
+      case '0': return '\0';
       case '\'': return '\'';
       case '\\': return '\\';
       default: yyerror("ERROR : Invalid character escape sequence!"); break;

@@ -59,8 +59,10 @@ decl : func
      | qualf cons var ASSOC lits
      ;
 
-func : FUNC qualf types ID opvars DONE
-     | FUNC qualf types ID opvars DO body
+func : FUNC qualf VOID ID opvars DONE
+     | FUNC qualf type ID opvars DONE
+     | FUNC qualf VOID ID opvars DO body
+     | FUNC qualf type ID opvars DO body opretn
      ;
 
 opvars :
@@ -82,10 +84,6 @@ qualf :
 cons :
      | CONS
      ;
-
-types : VOID
-      | type
-      ;
 
 type : IDNUM
      | IDSTR
@@ -130,11 +128,13 @@ elifs :
       | elifs ELIF expr THEN block
       ;
 
-block : insts retn
+block : insts opretn
       ;
 
-retn : 
-     | RETN
+opretn : 
+       | retn
+
+retn : RETN
      | RETN expr
 
 expr : leftv
