@@ -1,0 +1,5 @@
+program
+number a := 1;
+start
+a!
+end

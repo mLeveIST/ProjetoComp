@@ -1,0 +1,6 @@
+program
+numer a := 1;
+number b := 2
+start
+a-b!
+end
