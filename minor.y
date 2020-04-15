@@ -7,6 +7,8 @@
 #define YYDEBUG 1
 
 int yylex(), yyerror(char *s), yyparse();
+
+Node *funcNode(Node *n1, Node *n2, Node *n3, Node *n4, Node *n5, char *id);
 %}
 
 %union {
@@ -15,11 +17,11 @@ int yylex(), yyerror(char *s), yyparse();
   Node *n;
 }
 
-%token PROGRAM MODULE START END
+%token PROG MODL START END
 %token VOID CONS NUMTYPE ARRTYPE STRTYPE
-%token FUNC PUBL FRWD RETURN
+%token FUNC PUBL FRWD RETN
 %token IF THEN ELIF ELSE FI
-%token FOR UNTIL STEP DO REPEAT STOP DONE
+%token FOR UNTIL STEP DO REP STOP DONE
 
 %token <i> NUM CHA
 %token <s> ID STR 
@@ -37,27 +39,29 @@ int yylex(), yyerror(char *s), yyparse();
 %nonassoc '(' '['
 
 %type <n> prog modl opdecls decls decl
-%type <n> func opvars vars var qualf cons
+%type <n> func params vars var qualf cons
 %type <n> type lits litexp lit body bvars
 %type <n> insts inst elifs block opretn retn
 %type <n> expr leftv args
 
-%token NIL ERR PROG MODL DECLS DECL VARS VAR LIT_EXP QUALIFIER TYPE LEFT_VAL ARGS CALL BODY BODY_VARS ARR_CHAIN INSTS BLOCK RETN STP REP ALLOC
+%token NIL ERR DECLS DECL VARS VAR LIT_EXP QUALIFIER TYPE LEFT_VAL ARGS CALL
+%token BODY BODY_VARS ARR_CHAIN INSTS BLOCK ALLOC IFELSE CONDT RANGE
+%token MODIFIERS VALUE INDEX SIGNT FBODY FDECL
 
 %%
 
-file : prog                   { printNode($1, 0, (char**) yyname); freeNode($1); }
-     | modl                   { printNode($1, 0, (char**) yyname); freeNode($1); }
+file : prog                   { /*printNode($1, 0, (char**) yyname); freeNode($1);*/ }
+     | modl                   { /*printNode($1, 0, (char**) yyname); freeNode($1);*/ }
      ;
 
-prog : PROGRAM opdecls START body END               { $$ = binNode(PROG, $2, $4); }
+prog : PROG opdecls START body END               { $$ = binNode(PROG, $2, $4); }
      ;
 
-modl : MODULE opdecls END     { $$ = uniNode(MODL, $2); }
+modl : MODL opdecls END     { $$ = uniNode(MODL, $2); }
      ;
 
 opdecls :                     { $$ = nilNode(NIL); }
-        | decls               { $$ = $1 }
+        | decls               { $$ = $1; }
         ;
 
 decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
@@ -65,26 +69,26 @@ decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
       ;
 
 decl : func                                         { $$ = $1; }
-     | qualf cons var                               { $$ = quadNode(DECL, $1, $2, $3, nilNode(NIL)); }
-     | qualf cons var ASSOC lits                    { $$ = quadNode(DECL, $1, $2, $3, $5); }
+     | qualf cons var                               { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VALUE, $3, nilNode(NIL))); }
+     | qualf cons var ASSOC lits                    { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VALUE, $3, $5)); }
      ;
 
-func : FUNC qualf VOID ID opvars DONE               {}
-     | FUNC qualf type ID opvars DONE               {}
-     | FUNC qualf VOID ID opvars DO body            {}
-     | FUNC qualf type ID opvars DO body opretn     {}
+func : FUNC qualf VOID ID params DONE               { $$ = funcNode($2, nilNode(NIL), $5, nilNode(NIL), nilNode(NIL), $4); }
+     | FUNC qualf type ID params DONE               { $$ = funcNode($2, $3, $5, nilNode(NIL), nilNode(NIL), $4); }
+     | FUNC qualf VOID ID params DO body            { $$ = funcNode($2, nilNode(NIL), $5, $7, nilNode(NIL), $4); }
+     | FUNC qualf type ID params DO body opretn     { $$ = funcNode($2, $3, $5, $7, $8, $4); }
      ;
 
-opvars :                      { $$ = nilNode(NIL); }
-       | vars                 { $$ = $1 }
+params :                      { $$ = nilNode(NIL); }
+       | vars                 { $$ = $1; }
        ;
 
 vars : var                    { $$ = binNode(VARS, nilNode(NIL), $1); }
      | vars ';' var           { $$ = binNode(VARS, $1, $3); }
      ;
 
-var : type ID                 { $$ = triNode(VAR, $1, strNode(ID, $2), nilNode(NIL)); }
-    | type ID '[' NUM ']'     { $$ = triNode(VAR, $1, strNode(ID, $2), intNode(NUM, $4)); }
+var : type ID                 { $$ = binNode(VAR, $1, strNode(ID, $2)); }
+    | type ID '[' NUM ']'     { $$ = binNode(INDEX, binNode(VAR, $1, strNode(ID, $2)), intNode(NUM, $4)); }
     ;
 
 qualf :                       { $$ = nilNode(NIL); }
@@ -102,7 +106,7 @@ type : NUMTYPE                { $$ = nilNode(TYPE); }
      ;
 
 lits : litexp                 { $$ = $1; }
-     | lits ',' NUM           { $$ = binNode(ARR_CHAIN, $1, $3); }
+     | lits ',' NUM           { $$ = binNode(ARR_CHAIN, $1, intNode(NUM, $3)); }
      ;
 
 litexp : lit                  { $$ = binNode(LIT_EXP, nilNode(NIL), $1); }
@@ -125,18 +129,18 @@ insts :                       { $$ = nilNode(NIL); }
       | insts inst            { $$ = binNode(INSTS, $1, $2); }
       ;
 
-inst : IF expr THEN block elifs FI                     { $$ = triNode(IF, $2, $4, $5); }
-     | IF expr THEN block elifs ELSE block FI          { $$ = binNode(ELSE, triNode(IF, $2, $4, $5), $7); }
-     | FOR expr UNTIL expr STEP expr DO block DONE     { $$ = quadNode(FOR, $2, $4, $6, $8); }
+inst : IF expr THEN block elifs FI                     { $$ = binNode(IF, binNode(CONDT, $2, $4), $5); }
+     | IF expr THEN block elifs ELSE block FI          { $$ = binNode(IFELSE, binNode(IF, binNode(CONDT, $2, $4), $5), $7); }
+     | FOR expr UNTIL expr STEP expr DO block DONE     { $$ = binNode(FOR, binNode(RANGE, $2, binNode(DO, $4, $6)), $8); }
      | expr ';'                                        { $$ = $1; }
      | expr '!'                                        { $$ = uniNode('!', $1); }
-     | REPEAT                                          { $$ = nilNode(REP); }
-     | STOP                                            { $$ = nilNode(STP); }
+     | REP                                             { $$ = nilNode(REP); }
+     | STOP                                            { $$ = nilNode(STOP); }
      | leftv '#' expr ';'                              { $$ = binNode(ALLOC, $3, $1); }
      ;
 
 elifs :                                   { $$ = nilNode(NIL); }
-      | elifs ELIF expr THEN block        { $$ = triNode(ELIF, $1, $3, $5); }
+      | elifs ELIF expr THEN block        { $$ = binNode(ELIF, $1, binNode(CONDT, $3, $5)); }
       ;
 
 block : insts opretn                      { $$ = binNode(BLOCK, $1, $2); }
@@ -145,8 +149,8 @@ block : insts opretn                      { $$ = binNode(BLOCK, $1, $2); }
 opretn :                                  { $$ = nilNode(NIL); }
        | retn                             { $$ = $1; }
 
-retn : RETURN                             { $$ = uniNode(RETN, nilNode(NIL)); }
-     | RETURN expr                        { $$ = uniNode(RETN, $2); }
+retn : RETN                             { $$ = uniNode(RETN, nilNode(NIL)); }
+     | RETN expr                        { $$ = uniNode(RETN, $2); }
 
 expr : leftv                              { $$ = $1; }
      | litexp                             { $$ = $1; }
@@ -190,3 +194,14 @@ char **yynames =
 #else
   0;
 #endif
+
+Node *funcNode(Node *n1, Node *n2, Node *n3, Node *n4, Node *n5, char *id)
+{
+  return binNode(FUNC,
+             binNode(FDECL,
+                 binNode(MODIFIERS, n1, nilNode(NIL)),
+                 binNode(SIGNT,
+                     binNode(VAR, n2, strNode(ID, id)),
+                     n3)),
+             binNode(FBODY, n4, n5));
+}

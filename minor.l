@@ -27,8 +27,8 @@ WSP [ \n\t\r]
 
 %%
 
-^program                   { BEGIN IN_CODE; return PROGRAM; }
-^module                    { BEGIN IN_CODE; return MODULE; }
+^program                   { BEGIN IN_CODE; return PROG; }
+^module                    { BEGIN IN_CODE; return MODL; }
 
 .|\n                       ;
 
@@ -59,10 +59,10 @@ WSP [ \n\t\r]
 "until"                    return UNTIL;
 "step"                     return STEP;
 "do"                       return DO;
-"repeat"                   return REPEAT;
+"repeat"                   return REP;
 "stop"                     return STOP;
 "done"                     return DONE;
-"return"                   return RETURN;
+"return"                   return RETN;
 
 ":="                       return ASSOC;
 "<="                       return LE;

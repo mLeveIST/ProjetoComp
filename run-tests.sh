@@ -19,12 +19,3 @@ for f in exs/moretests/*.min; do
     echo .
   fi
 done
-
-for f in exs/sem_tests/*.min; do
-  ./minor < $f
-  if [ $? -ne 0 ]; then
-    echo $f "did not pass"
-  else
-    echo .
-  fi
-done
