@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "node.h"
 #include "y.tab.h"
 
 char *dupstr(const char *s);
@@ -26,8 +27,8 @@ WSP [ \n\t\r]
 
 %%
 
-^program                   { BEGIN IN_CODE; return PROG; }
-^module                    { BEGIN IN_CODE; return MODL; }
+^program                   { BEGIN IN_CODE; return PROGRAM; }
+^module                    { BEGIN IN_CODE; return MODULE; }
 
 .|\n                       ;
 
@@ -43,9 +44,9 @@ WSP [ \n\t\r]
 "start"                    return START;
 "void"                     return VOID;
 "const"                    return CONS;
-"number"                   return IDNUM;
-"array"                    return IDVEC;
-"string"                   return IDSTR;
+"number"                   return NUMTYPE;
+"array"                    return ARRTYPE;
+"string"                   return STRTYPE;
 "function"                 return FUNC;
 "public"                   return PUBL;
 "forward"                  return FRWD;
@@ -58,10 +59,10 @@ WSP [ \n\t\r]
 "until"                    return UNTIL;
 "step"                     return STEP;
 "do"                       return DO;
-"repeat"                   return REP;
+"repeat"                   return REPEAT;
 "stop"                     return STOP;
 "done"                     return DONE;
-"return"                   return RETN;
+"return"                   return RETURN;
 
 ":="                       return ASSOC;
 "<="                       return LE;
