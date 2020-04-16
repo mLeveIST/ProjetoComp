@@ -39,14 +39,14 @@ Node *funcNode(Node *n1, Node *n2, Node *n3, Node *n4, Node *n5, char *id);
 %nonassoc '(' '['
 
 %type <n> prog modl opdecls decls decl
-%type <n> func params vars var qualf cons
-%type <n> type lit body bvars
+%type <n> func fbody fhead ftype params vars
+%type <n> var qualf cons type lit body bvars
 %type <n> insts inst elifs block opretn retn
 %type <n> expr leftv args lits numlst litlst
 
 %token NIL ERR DECLS DECL VARS VAR LIT_EXP LEFT_VAL ARGS CALL
 %token BODY BODY_VARS ARRAY INSTS BLOCK ALLOC IFELSE CONDT RANGE
-%token MODIFIERS VALUE INDEX FSIGNATURE VSIGNATURE FBODY FDECL VALUE
+%token MODIFIERS VALUE INDEX FSIGNATURE VSIGNATURE FBODY FHEAD VALUE
 
 %%
 
@@ -70,16 +70,24 @@ decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
       | decls ';' error       { $$ = binNode(DECLS, $1, nilNode(ERR)); }
       ;
 
-decl : func                                         { $$ = $1; }
-     | qualf cons var                               { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, nilNode(NIL))); }
-     | qualf cons var ASSOC lits                    { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, $5)); }
+decl : func                          { $$ = $1; }
+     | qualf cons var                { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, nilNode(NIL))); }
+     | qualf cons var ASSOC lits     { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, $5)); }
      ;
 
-func : FUNC qualf VOID ID params DONE               { $$ = funcNode($2, nilNode(VOID), $5, nilNode(NIL), nilNode(NIL), $4); }
-     | FUNC qualf type ID params DONE               { $$ = funcNode($2, $3, $5, nilNode(NIL), nilNode(NIL), $4); }
-     | FUNC qualf VOID ID params DO body            { $$ = funcNode($2, nilNode(VOID), $5, $7, nilNode(NIL), $4); }
-     | FUNC qualf type ID params DO body opretn     { $$ = funcNode($2, $3, $5, $7, $8, $4); }
+func : FUNC fhead fbody       { $$ = binNode(FUNC, $2, $3); }
      ;
+
+fbody : DONE                  { $$ = nilNode(DONE); }
+      | DO body opretn        { $$ = binNode(FBODY, $2, $3); } 
+      ;
+
+fhead : qualf ftype params    { $$ = binNode(FHEAD, $1, binNode(FSIGNATURE, $2, $3)); }
+      ;
+
+ftype : VOID ID               { $$ = binNode(VAR, nilNode(VOID), strNode(ID, $2)); }
+      | type ID               { $$ = binNode(VAR, $1, strNode(ID, $2)); }
+      ;
 
 params :                      { $$ = nilNode(NIL); }
        | vars                 { $$ = $1; }
@@ -202,13 +210,4 @@ char **yynames =
   0;
 #endif
 
-Node *funcNode(Node *n1, Node *n2, Node *n3, Node *n4, Node *n5, char *id)
-{
-  return binNode(FUNC,
-             binNode(FDECL,
-                 binNode(MODIFIERS, n1, nilNode(NIL)),
-                 binNode(FSIGNATURE,
-                     binNode(VAR, n2, strNode(ID, id)),
-                     n3)),
-             binNode(FBODY, n4, n5));
-}
+
