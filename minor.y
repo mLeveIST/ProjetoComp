@@ -80,17 +80,11 @@ decl : func                                         { $$ = $1; }
                                                       $$ = }
      ;
 
-func : FUNC qualf ftype ID params fbody     { $$ = funcNode($2, $3, $5, $7, $8, $4); }
+func : FUNC qualf VOID ID params DONE               { $$ = funcNode($2, nilNode(VOID), $5, nilNode(NIL), nilNode(NIL), $4); }
+     | FUNC qualf type ID params DONE               { $$ = funcNode($2, $3, $5, nilNode(NIL), nilNode(NIL), $4); }
+     | FUNC qualf VOID ID params DO body            { $$ = funcNode($2, nilNode(VOID), $5, $7, nilNode(NIL), $4); }
+     | FUNC qualf type ID params DO body opretn     { $$ = funcNode($2, $3, $5, $7, $8, $4); }
      ;
-
-ftype : VOID
-      | type
-      ;
-
-fbody : DONE
-      | DO body
-      | DO body opretn
-      ;
 
 params :                      { $$ = nilNode(NIL); }
        | vars                 { $$ = $1; }
