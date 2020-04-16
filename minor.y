@@ -101,18 +101,26 @@ var : type ID                 { $$ = binNode(VAR, $1, strNode(ID, $2)); }
     | type ID '[' NUM ']'     { $$ = binNode(INDEX, binNode(VAR, $1, strNode(ID, $2)), intNode(NUM, $4)); }
     ;
 
-qualf :                       { $$ = nilNode(NIL); }
-      | PUBL                  { $$ = nilNode(PUBL); }
-      | FRWD                  { $$ = nilNode(FRWD); }
+qualf :                       { $$ = nilNode(NIL);
+                                $$->info = 0; }
+      | PUBL                  { $$ = nilNode(PUBL);
+                                $$->info = PUBL; }
+      | FRWD                  { $$ = nilNode(FRWD);
+                                $$->info = FRWD; }
       ;
 
-cons :                        { $$ = nilNode(NIL); }
-     | CONS                   { $$ = nilNode(CONS); }
+cons :                        { $$ = nilNode(NIL);
+                                $$->info = 0; }
+     | CONS                   { $$ = nilNode(CONS);
+                                $$->info = CONS; }
      ;
 
-type : NUMTYPE                { $$ = nilNode(NUMTYPE); }
-     | STRTYPE                { $$ = nilNode(STRTYPE); }
-     | ARRTYPE                { $$ = nilNode(ARRTYPE); }
+type : NUMTYPE                { $$ = nilNode(NUMTYPE);
+                                $$->info = NUMTYPE; }
+     | STRTYPE                { $$ = nilNode(STRTYPE);
+                                $$->info = STRTYPE; }
+     | ARRTYPE                { $$ = nilNode(ARRTYPE);
+                                $$->info = ARRTYPE; }
      ;
 
 lits : numlst                 { $$ = $1; }
