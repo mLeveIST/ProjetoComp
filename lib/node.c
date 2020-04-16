@@ -257,7 +257,7 @@ void freeNode(Node *p) {
     free (p);
 }
 
-int debugNode;
+int debugNode, infoNode, placeNode;
 static int print(Node *p, FILE *fp, char *tab[], int lev) {
     unsigned i, cnt = 0;
 
@@ -265,6 +265,8 @@ static int print(Node *p, FILE *fp, char *tab[], int lev) {
     cnt++;
     if (p->type == nodeOpr) fprintf(fp,"\n%*s(", 2*lev, " ");
     if (debugNode) fprintf(fp," [%lx]", (long)p);
+    if (infoNode) fprintf(fp," {%d}", p->info);
+    if (placeNode) fprintf(fp," <%ld>", p->place);
     if (tab != 0)
       fprintf(fp," %s:", tab[p->attrib]);
     else
