@@ -9,6 +9,9 @@
 int yylex(), yyerror(char *s), yyparse();
 
 Node *funcNode(Node *n1, Node *n2, Node *n3, Node *n4, Node *n5, char *id);
+
+int chain_size = 0;
+int in_for, in_if;
 %}
 
 %union {
@@ -71,15 +74,23 @@ decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
       ;
 
 decl : func                                         { $$ = $1; }
-     | qualf cons var                               { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, nilNode(NIL))); }
-     | qualf cons var ASSOC lits                    { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, $5)); }
+     | qualf cons var                               { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, nilNode(NIL)));
+                                                      $$ = }
+     | qualf cons var ASSOC lits                    { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VSIGNATURE, $3, $5));
+                                                      $$ = }
      ;
 
-func : FUNC qualf VOID ID params DONE               { $$ = funcNode($2, nilNode(NIL), $5, nilNode(NIL), nilNode(NIL), $4); }
-     | FUNC qualf type ID params DONE               { $$ = funcNode($2, $3, $5, nilNode(NIL), nilNode(NIL), $4); }
-     | FUNC qualf VOID ID params DO body            { $$ = funcNode($2, nilNode(NIL), $5, $7, nilNode(NIL), $4); }
-     | FUNC qualf type ID params DO body opretn     { $$ = funcNode($2, $3, $5, $7, $8, $4); }
+func : FUNC qualf ftype ID params fbody     { $$ = funcNode($2, $3, $5, $7, $8, $4); }
      ;
+
+ftype : VOID
+      | type
+      ;
+
+fbody : DONE
+      | DO body
+      | DO body opretn
+      ;
 
 params :                      { $$ = nilNode(NIL); }
        | vars                 { $$ = $1; }
@@ -89,39 +100,57 @@ vars : var                    { $$ = binNode(VARS, nilNode(NIL), $1); }
      | vars ';' var           { $$ = binNode(VARS, $1, $3); }
      ;
 
-var : type ID                 { $$ = binNode(VAR, $1, strNode(ID, $2)); }
-    | type ID '[' NUM ']'     { $$ = binNode(INDEX, binNode(VAR, $1, strNode(ID, $2)), intNode(NUM, $4)); }
+var : type ID                 { $$ = binNode(VAR, $1, strNode(ID, $2));
+                                IDnew($1->info, $2, 0); }
+    | type ID '[' NUM ']'     { $$ = binNode(INDEX, binNode(VAR, $1, strNode(ID, $2)), intNode(NUM, $4));
+                                if ($1->info != ARRTYPE) yyerror("ERROR : Cannot define size for type array!");
+                                IDnew(ARRTYPE, $2, ); }
     ;
 
-qualf :                       { $$ = nilNode(NIL); }
-      | PUBL                  { $$ = nilNode(PUBL); }
-      | FRWD                  { $$ = nilNode(FRWD); }
+qualf :                       { $$ = nilNode(NIL);
+                                $$->info = 0; }
+      | PUBL                  { $$ = nilNode(PUBL);
+                                $$->info = PUBL; }
+      | FRWD                  { $$ = nilNode(FRWD);
+                                $$->info = FRWD; }
       ;
 
-cons :                        { $$ = nilNode(NIL); }
-     | CONS                   { $$ = nilNode(CONS); }
+cons :                        { $$ = nilNode(NIL);
+                                $$->info = 0; }
+     | CONS                   { $$ = nilNode(CONS);
+                                $$->info = CONS; }
      ;
 
-type : NUMTYPE                { $$ = nilNode(NUMTYPE); }
-     | STRTYPE                { $$ = nilNode(STRTYPE); }
-     | ARRTYPE                { $$ = nilNode(ARRTYPE); }
+type : NUMTYPE                { $$ = nilNode(NUMTYPE);
+                                $$->info = NUMTYPE; }
+     | STRTYPE                { $$ = nilNode(STRTYPE);
+                                $$->info = STRTYPE; }
+     | ARRTYPE                { $$ = nilNode(ARRTYPE);
+                                $$->info = ARRTYPE; }
      ;
 
-lits : numlst                 { $$ = $1; }
-     | litlst                 { $$ = $1; }
+lits : numlst                 { $$ = $1;
+                                $$->info = ARRTYPE; }
+     | litlst                 { $$ = $1;
+                                $$->info = $1->info; }
      ;
 
 numlst : NUM ',' NUM          { $$ = binNode(ARRAY, intNode(NUM, $1), intNode(NUM, $3)); }
        | numlst ',' NUM       { $$ = binNode(ARRAY, $1, intNode(NUM, $3)); }
        ;
 
-litlst : lit                  { $$ = binNode(VALUE, nilNode(NIL), $1); }
-       | litlst lit           { $$ = binNode(VALUE, $1, $2); }
+litlst : lit                  { $$ = binNode(VALUE, nilNode(NIL), $1);
+                                $$->info = $1->info; }
+       | litlst lit           { $$ = binNode(VALUE, $1, $2);
+                                $$->info = STRTYPE; }
        ;
 
-lit : NUM                     { $$ = intNode(NUM, $1); }
-    | CHA                     { $$ = intNode(CHA, $1); }
-    | STR                     { $$ = strNode(STR, $1); }
+lit : NUM                     { $$ = intNode(NUM, $1);
+                                $$->info = NUMTYPE; }
+    | CHA                     { $$ = intNode(CHA, $1);
+                                $$->info = NUMTYPE; }
+    | STR                     { $$ = strNode(STR, $1);
+                                $$->info = STRTYPE; }
     ;
 
 body : bvars insts            { $$ = binNode(BODY, $1, $2); }
@@ -185,8 +214,10 @@ expr : leftv                              { $$ = $1; }
      | leftv ASSOC expr                   { $$ = binNode(ASSOC, $1, $3); }
      ;
 
-leftv : ID                  { $$ = binNode(LEFT_VAL, strNode(ID, $1), nilNode(NIL)); }
-      | ID '[' expr ']'     { $$ = binNode(LEFT_VAL, strNode(ID, $1), $3); }
+leftv : ID                  { $$ = binNode(LEFT_VAL, strNode(ID, $1), nilNode(NIL));
+                              $$->info = IDfind($1, 0); }
+      | ID '[' expr ']'     { $$ = binNode(LEFT_VAL, strNode(ID, $1), $3);
+                              $$->info = checkIndexation($1, $3); }
       ;
 
 args : expr                 { $$ = binNode(ARGS, nilNode(NIL), $1); }
@@ -211,4 +242,13 @@ Node *funcNode(Node *n1, Node *n2, Node *n3, Node *n4, Node *n5, char *id)
                      binNode(VAR, n2, strNode(ID, id)),
                      n3)),
              binNode(FBODY, n4, n5));
+}
+
+static int checkIndexation(char *id, Node *offset)
+{
+  if (IDfind(id, 0) = NUMTYPE)
+    yyerror("ERROR : Cannot index an integer!");
+  if (offset->info != NUMTYPE)
+    yyerror("ERROR : Offset must be an integer!");
+  return NUMTYPE;
 }
