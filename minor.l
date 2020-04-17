@@ -43,11 +43,11 @@ WSP [ \n\t\r]
 ^end                       { BEGIN INITIAL; return END; }
 "start"                    return START;
 "void"                     return VOID;
-"const"                    return CONS;
 "number"                   return NUMTYPE;
 "array"                    return ARRTYPE;
 "string"                   return STRTYPE;
 "function"                 return FUNC;
+"const"                    return CONS;
 "public"                   return PUBL;
 "forward"                  return FRWD;
 "if"                       return IF;

@@ -8,8 +8,27 @@
 #define YYDEBUG 1
 
 int yylex(), yyerror(char *s), yyparse();
+int errors;
 
+static int formatType(int type, int qualifier, int constant);
+static int parseType(int idtype);
+static int parseQualifier(int idtype);
+static int parseConstant(int idtype);
+
+static Node *varNode(Node *type, char *id, Node *dim);
+static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval);
+static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params);
+
+static int checkReturn(Node *n);
+static void checkIfExpr(Node *n1);
 static void checkInFor();
+static void checkForExpr(Node *n1, Node *n2, Node *n3);
+static int checkInvocation(char *id, Node *n2);
+static int compareArgs(Node *decl, Node *call);
+static void checkAllocation(Node *n1, Node *n2);
+static void declareVariable(Node *type, char *id, int dim);
+static void declareFunction(Node *n1, Node *n2, char *id);
+static int checkIntPOp(Node *n1, Node *n2);
 static int checkAddress(Node *n1);
 static int checkAssociation(Node *n1, Node *n2);
 static int checkInvocation(char *id, Node *n2);
@@ -18,9 +37,13 @@ static int checkIfInt(Node *n1);
 static int checkIntOp(Node *n1, Node *n2);
 static int checkCompOp(Node *n1, Node *n2);
 
-int in_for;
+int for_lvl;
 int qualifier, constant;
-int is_null;
+int not_null;
+int func_type;
+int lstSize;
+
+Node *auxPtr;
 %}
 
 %union {
@@ -50,23 +73,24 @@ int is_null;
 %nonassoc '?' UMINUS ADDR
 %nonassoc '(' '['
 
-%type <n> prog modl opdecls decls decl
-%type <n> func fbody fhead ftype params vars
-%type <n> var qualf cons type lit body bvars
+%type <n> prog modl opdecls decls decl declval
+%type <n> func fbody fhead ftype vars params
+%type <n> var dim qualf cons type lit body bvars
 %type <n> insts inst elifs block endinst retn
 %type <n> expr leftv args lits numlst litlst
 
 %token NIL ERR DECLS DECL VARS VAR LIT_EXP LEFT_VAL ARGS CALL
 %token BODY BODY_VARS ARRAY INSTS BLOCK ALLOC IFELSE CONDT RANGE
-%token MODIFIERS VALUE INDEX FTYPE VTYPE FBODY FHEAD VALUE
+%token MODIFIERS LVAL FTYPE DVAL FBODY FHEAD VVAL FVAL
 
 %%
 
-file : prog                   { /*printNode($1, 0, (char**) yyname); freeNode($1);*/ }
-     | modl                   { /*printNode($1, 0, (char**) yyname); freeNode($1);*/ }
+file : prog                   { /*if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1);*/ }
+     | modl                   { /*if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1);*/ }
      ;
 
-prog : PROG opdecls START { IDpush(); } body END     { $$ = binNode(PROG, $2, $4); IDpop(); }
+prog : PROG opdecls START     { func_type = NUMTYPE; }
+     body END                 { $$ = binNode(PROG, $2, $4); }
      ;
 
 modl : MODL opdecls END       { $$ = uniNode(MODL, $2); }
@@ -83,54 +107,59 @@ decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
       ;
 
 decl : func                          { $$ = $1; }
-     | qualf cons var                { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VTYPE, $3, nilNode(NIL))); }
-     | qualf cons var ASSOC lits     { $$ = binNode(DECL, binNode(MODIFIERS, $1, $2), binNode(VTYPE, $3, $5)); }
+     | qualf cons var declval        { $$ = declNode($1, $2, $3, $4); }
      ;
 
-func : FUNC fhead fbody       { $$ = binNode(FUNC, $2, $3); IDpop(); }
+declval :                     { $$ = nilNode(NIL); }
+        | ASSOC lits          { $$ = $2; }
+        ;
+
+func : FUNC fhead fbody       { $$ = binNode(FUNC, $2, $3); IDpop(); func_type = 0; }
      ;
 
 fbody : DONE                  { $$ = nilNode(DONE); }
-      | DO body endinst       { $$ = binNode(FBODY, $2, $3); } 
+      | DO body retn          { $$ = binNode(FBODY, $2, $3); } 
       ;
 
-fhead : qualf ftype ID        { IDnew($2->info, $3, 0); /* add params */ }
-        params                { $$ = binNode(FHEAD, $1, binNode(FTYPE, binNode(VAR, $2, strNode(ID, $3)), $5)); IDpush(); }
+fhead : qualf ftype ID        { IDpush(); func_type = $2->info; }
+        params                { $$ = funcNode($1, $2, $3, $5); }
       ;
 
 ftype : VOID                  { $$ = nilNode(VOID);
                                 $$->info = VOID; }
-      | type                  { $$ = $1;
-                                $$->info = $1->info; }
+      | type                  { $$ = $1; }
       ;
 
 params :                      { $$ = nilNode(NIL); }
        | vars                 { $$ = $1; }
        ;
 
-vars : var                    { $$ = binNode(VARS, nilNode(NIL), $1); }
-     | vars ';' var           { $$ = binNode(VARS, $1, $3); }
+vars : var                    { $$ = binNode(ARGS, nilNode(NIL), $1);
+                                $$->info = $1->info; if ($1->info != -1) IDnew(formatType($1->info, 0, 0), auxPtr->value.s, 0); }
+     | vars ';' var           { $$ = binNode(ARGS, $1, $3);
+                                $$->info = $3->info; if ($3->info != -1) IDnew(formatType($3->info, 0, 0), auxPtr->value.s, 0); }
      ;
 
-var : type ID                 { $$ = binNode(VAR, $1, strNode(ID, $2));
-                                IDnew($1->info, $2, 0); }
-    | type ID '[' NUM ']'     { $$ = binNode(INDEX, binNode(VAR, $1, strNode(ID, $2)), intNode(NUM, $4));
-                                if ($1->info != ARRTYPE) yyerror("ERROR : Cannot define size for type array!");
-                                IDnew(ARRTYPE, $2, 0); /* add size? */ }
+var : type ID dim             { $$ = varNode($1, $2, $3); }
+    ;
+
+dim :                         { $$ = nilNode(NIL); }
+    | '[' NUM ']'             { $$ = intNode(NUM, $2);
+                                $$->info = $2; }
     ;
 
 qualf :                       { $$ = nilNode(NIL);
-                                qualifier = 0; }
+                                $$->info = 0; }
       | PUBL                  { $$ = nilNode(PUBL);
-                                qualifier = PUBL; }
+                                $$->info = PUBL; }
       | FRWD                  { $$ = nilNode(FRWD);
-                                qualifier = FRWD; }
+                                $$->info = FRWD; }
       ;
 
 cons :                        { $$ = nilNode(NIL);
-                                constant = 0; }
+                                $$->info = 0; }
      | CONS                   { $$ = nilNode(CONS);
-                                constant = CONS; }
+                                $$->info = CONS; }
      ;
 
 type : NUMTYPE                { $$ = nilNode(NUMTYPE);
@@ -143,33 +172,35 @@ type : NUMTYPE                { $$ = nilNode(NUMTYPE);
 
 lits : numlst                 { $$ = $1;
                                 $$->info = ARRTYPE; }
-     | litlst                 { $$ = $1;
-                                $$->info = $1->info; }
+     | litlst                 { $$ = $1; }
      ;
 
-numlst : NUM ',' NUM          { $$ = binNode(ARRAY, intNode(NUM, $1), intNode(NUM, $3)); }
-       | numlst ',' NUM       { $$ = binNode(ARRAY, $1, intNode(NUM, $3)); }
+numlst : NUM ',' NUM          { $$ = binNode(ARRAY, intNode(NUM, $1), intNode(NUM, $3));
+                                lstSize = 2; not_null = 1; }
+       | numlst ',' NUM       { $$ = binNode(ARRAY, $1, intNode(NUM, $3));
+                                ++lstSize; }
        ;
 
-litlst : lit                  { $$ = binNode(VALUE, nilNode(NIL), $1);
-                                $$->info = $1->info; }
-       | litlst lit           { $$ = binNode(VALUE, $1, $2);
-                                $$->info = STRTYPE; }
+litlst : lit                  { $$ = binNode(LVAL, nilNode(NIL), $1);
+                                $$->info = $1->info; lstSize = 1; }
+       | litlst lit           { $$ = binNode(LVAL, $1, $2);
+                                $$->info = STRTYPE; ++lstSize; }
        ;
 
 lit : NUM                     { $$ = intNode(NUM, $1);
-                                $$->info = NUMTYPE; is_null = $1; }
+                                $$->info = NUMTYPE; not_null = $1; }
     | CHA                     { $$ = intNode(CHA, $1);
-                                $$->info = NUMTYPE; }
+                                $$->info = NUMTYPE; not_null = $1; }
     | STR                     { $$ = strNode(STR, $1);
-                                $$->info = STRTYPE; }
+                                $$->info = STRTYPE; not_null = 1; }
     ;
 
 body : bvars insts            { $$ = binNode(BODY, $1, $2); }
      ;
 
 bvars :                       { $$ = nilNode(NIL); }
-      | bvars var ';'         { $$ = binNode(BODY_VARS, $1, $2); }
+      | bvars var ';'         { $$ = binNode(BODY_VARS, $1, $2);
+                                if ($2->info != -1) IDnew(formatType($2->info, 0, 0), auxPtr->value.s, 0); }
       ;
 
 insts :                       { $$ = nilNode(NIL); }
@@ -177,42 +208,49 @@ insts :                       { $$ = nilNode(NIL); }
       | insts error           { $$ = binNode(INSTS, $1, nilNode(ERR)); }
       ;
 
-inst : IF expr THEN block elifs FI                     { $$ = binNode(IF, binNode(CONDT, $2, $4), $5); }
-     | IF expr THEN block elifs ELSE block FI          { $$ = binNode(IFELSE, binNode(IF, binNode(CONDT, $2, $4), $5), $7); }
-     | FOR expr UNTIL expr STEP expr DO block DONE     { $$ = binNode(FOR, binNode(RANGE, $2, binNode(DO, $4, $6)), $8); }
-     | expr ';'                                        { $$ = $1; }
-     | expr '!'                                        { $$ = uniNode('!', $1); }
-     | leftv '#' expr ';'                              { $$ = binNode(ALLOC, $3, $1); }
+inst : IF expr THEN block elifs FI                { $$ = binNode(IF, binNode(CONDT, $2, $4), $5);
+                                                    checkIfExpr($2); }
+     | IF expr THEN block elifs ELSE block FI     { $$ = binNode(IFELSE, binNode(IF, binNode(CONDT, $2, $4), $5), $7);
+                                                    checkIfExpr($2); }
+     | FOR expr UNTIL expr STEP expr DO           { for_lvl++; checkForExpr($2, $4, $6); }
+       block DONE                                 { $$ = binNode(FOR, binNode(RANGE, $2, binNode(DO, $4, $6)), $9);
+                                                    for_lvl--; }
+     | expr ';'                                   { $$ = $1; }
+     | expr '!'                                   { $$ = uniNode('!', $1); }
+     | leftv '#' expr ';'                         { $$ = binNode(ALLOC, $3, $1);
+                                                    checkAllocation($1, $3);}
      ;
 
 elifs :                                   { $$ = nilNode(NIL); }
-      | elifs ELIF expr THEN block        { $$ = binNode(ELIF, $1, binNode(CONDT, $3, $5)); }
+      | elifs ELIF expr THEN block        { $$ = binNode(ELIF, $1, binNode(CONDT, $3, $5));
+                                            checkIfExpr($3); }
       ;
 
 block : insts endinst                      { $$ = binNode(BLOCK, $1, $2); }
       ;
 
-endinst :                                  { $$ = nilNode(NIL); }
-        | retn                             { $$ = $1; }
+endinst : retn                             { $$ = $1; }
         | REP                              { $$ = nilNode(REP); checkInFor(); }
         | STOP                             { $$ = nilNode(STOP); checkInFor(); }
         ;
 
-retn : RETN                               { $$ = uniNode(RETN, nilNode(NIL)); }
-     | RETN expr                          { $$ = uniNode(RETN, $2); }
+retn :                                    { $$ = nilNode(NIL); }
+     | RETN                               { $$ = uniNode(RETN, nilNode(NIL));
+                                            $$->info = checkReturn(NULL); }
+     | RETN expr                          { $$ = uniNode(RETN, $2);
+                                            $$->info = checkReturn($2); }
+     ;
 
 expr : leftv                              { $$ = $1;
-                                            $$->info = $1->info; }
-     | litlst                             { $$ = $1;
-                                            $$->info = $1->info; }
-     | '(' expr ')'                       { $$ = $2;
-                                            $$->info = $2->info; }
+                                            $$->info = parseType($1->info); }
+     | litlst                             { $$ = $1; }
+     | '(' expr ')'                       { $$ = $2; }
      | ID '(' args ')'                    { $$ = binNode(CALL, strNode(ID, $1), $3);
                                             $$->info = checkInvocation($1, $3); }
-     | ID '(' args ')' '[' expr ']'       { $$ = binNode(CALL, strNode(ID, $1), $3);
+     | ID '(' args ')' '[' expr ']'       { $$ = binNode(CALL, strNode(ID, $1), $3); /* Isto está mal, falta expr */
                                             $$->info = checkInvocation($1, $3); }
      | '?'                                { $$ = nilNode('?');
-                                            $$->info = NUMTYPE; /* What to do here? */}
+                                            $$->info = NUMTYPE; }
      | '&' leftv %prec ADDR               { $$ = uniNode(ADDR, $2);
                                             $$->info = checkAddress($2); }
      | '-' expr %prec UMINUS              { $$ = uniNode(UMINUS, $2);
@@ -226,9 +264,9 @@ expr : leftv                              { $$ = $1;
      | expr '%' expr                      { $$ = binNode('%', $1, $3);
                                             $$->info = checkIntOp($1, $3); }
      | expr '+' expr                      { $$ = binNode('+', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
+                                            $$->info = checkSumOp($1, $3); }
      | expr '-' expr                      { $$ = binNode('-', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
+                                            $$->info = checkSubOp($1, $3); }
      | expr '<' expr                      { $$ = binNode('<', $1, $3);
                                             $$->info = checkCompOp($1, $3); }
      | expr '>' expr                      { $$ = binNode('>', $1, $3);
@@ -257,8 +295,10 @@ leftv : ID                  { $$ = binNode(LEFT_VAL, strNode(ID, $1), nilNode(NI
                               $$->info = checkIndexation($1, $3); }
       ;
 
-args : expr                 { $$ = binNode(ARGS, nilNode(NIL), $1); }
-     | args ',' expr        { $$ = binNode(ARGS, $1, $3); }
+args : expr                 { $$ = binNode(ARGS, nilNode(NIL), $1);
+                              $$->info = $1->info; }
+     | args ',' expr        { $$ = binNode(ARGS, $1, $3);
+                              $$->info = $3->info; }
      ;
 
 %%
@@ -270,45 +310,296 @@ char **yynames =
   0;
 #endif
 
+static Node *varNode(Node *type, char *id, Node *dim)
+{
+  Node *var = binNode(VAR, binNode(VVAL, type, auxPtr = strNode(ID, id)), dim);
+  var->info = type->info;
+
+  if (type->info != ARRTYPE && dim->info != -1) {
+    yyerror("ERROR : Can only define dimension for array type!");
+    var->info = -1;
+  }
+  else if (type->info == ARRTYPE && dim->info == 0) {
+    yyerror("ERROR : Cannot define array with size 0!");
+    var->info = -1;
+  }
+
+  return var;
+}
+
+/* Return parse tree branch that represents a global variable declaration.
+ * Adds an entry in the symbol table for this variable only if the
+ * declaration is valid. If not, throws an error, but still builds the tree.
+ */
+static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
+{
+  void *attrib;
+  char *id;
+  int idtype, qualifier, dim;
+
+  id = auxPtr->value.s;
+
+  if (var->info != -1) {
+    if ((idtype = IDfind(id, (void**) IDtest)) != -1) {
+      if (IDfind(id, &attrib) && attrib != 0)
+        yyerror("ERROR : Variable name already taken by a function!");
+      else if ((qualifier = parseQualifier(idtype)) != FRWD)
+        yyerror("ERROR : Cannot redefine not forwarded variable!");
+      else {
+        idtype = formatType(var->info, qualif->info, cons->info);
+        IDchange(idtype, id, 0, 0);
+      }
+    }
+    else if ((dim = var->CHILD(1)->info) > 0 && dim < lstSize)
+      yyerror("ERROR : Number of integers exceeds specified dimension for array!");
+    else if (qualif->info != FRWD && cons->info == CONS && declval->info == -1)
+      yyerror("ERROR : Uninitialized constant variable!");
+    else if (declval->info != -1) {
+      if (var->info != NUMTYPE && !not_null)
+        yyerror("ERROR : Declaration cannot be initialized with a null pointer!");
+      else if ((dim > 0 && var->info == STRTYPE) || (dim < 1 && declval->info != var->info))
+        yyerror("ERROR : Initialized value does not match declared variable type!");
+      else
+        idtype = formatType(var->info, qualif->info, cons->info);
+        IDnew(idtype, id, 0);
+    }
+    else {
+      idtype = formatType(var->info, qualif->info, cons->info);
+      IDnew(idtype, id, 0);
+    }
+  }
+
+  return binNode(DECL, binNode(MODIFIERS, qualif, cons), binNode(DVAL, var, declval));
+}
+
+static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params)
+{
+  void *attrib;
+  int idtype;
+  int qualifier;
+
+  if ((idtype = IDfind(id, (void**) IDtest)) != -1) {
+    if (IDfind(id, &attrib) && !attrib)
+      yyerror("ERROR : Function name already taken by a variable!");
+    else if ((qualifier = parseQualifier(idtype)) != FRWD)
+      yyerror("ERROR : Cannot redefine not forwarded functions!");
+    else
+      idtype = formatType(ftype->info, qualif->info, 0);
+      IDchange(idtype, id, (void *) params, 1);
+  }
+  else {
+    idtype = formatType(ftype->info, qualif->info, 0);
+    IDinsert(0, idtype, id, (void *) params);
+  }
+
+  return binNode(FHEAD, qualif, binNode(FTYPE, binNode(FVAL, ftype, strNode(ID, id)), params));
+}
+
+static int formatType(int type, int qualifier, int constant)
+{
+  int idtype = 0;
+
+  switch (type) {
+    case VOID: idtype = 0; break;
+    case NUMTYPE: idtype = 1; break;
+    case ARRTYPE: idtype = 2; break;
+    case STRTYPE: idtype = 3; break;
+    default:
+      yyerror("ERROR : Invalid type!");
+      printf("%d:%d:%d\n", type, qualifier, constant);
+  }
+  idtype = idtype << 2;
+
+  switch (qualifier) {
+    case 0: break;
+    case PUBL: idtype += 1; break;
+    case FRWD: idtype += 2; break;
+    default:
+      yyerror("ERROR : Invalid qualifier!");
+      printf("%d:%d:%d\n", type, qualifier, constant);
+  }
+
+  return (idtype << 1) + (constant ? 1 : 0); 
+}
+
+static int parseType(int idtype)
+{
+  if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
+    return idtype;
+
+  switch (idtype >> 3) {
+    case 0: return VOID;
+    case 1: return NUMTYPE;
+    case 2: return ARRTYPE;
+    case 3: return STRTYPE;
+    default:
+      yyerror("ERROR : Invalid idtype, cannot filter type!");
+      printf(":%d:\n", idtype);
+  }
+  return -1;
+}
+
+static int parseQualifier(int idtype)
+{
+  if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
+    return 0;
+
+  switch ((idtype >> 1) & 3) {
+    case 0: return 0;
+    case 1: return PUBL;
+    case 2: return FRWD;
+    default:
+      yyerror("ERROR : Invalid idtype, cannot filter qualifier!");
+      printf(":%d:\n", idtype);
+  }
+  return -1;
+}
+
+static int parseConstant(int idtype)
+{
+  if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
+    return 0;
+
+  switch (idtype & 1) {
+    case 0: return 0;
+    case 1: return CONS;
+    default:
+      yyerror("ERROR : Invalid idtype, cannot filter constant!");
+      printf(":%d:\n", idtype);
+  }
+  return -1;
+}
+
+static int checkReturn(Node *n)
+{
+  if (n == NULL && func_type != VOID) {
+    yyerror("ERROR : Missing return expression!");
+    return -1;
+  }
+  else if (n->info != func_type) {
+    yyerror("ERROR : Return type does not match function type!");
+    return -1;
+  }
+  return n->info;
+}
+
 static void checkInFor()
 {
-  if (!in_for)
+  if (!for_lvl)
     yyerror("ERROR : Can only use instruction inside for loop!");
 }
 
-static int checkInvocation(char *id, Node *n2)
+static void checkAllocation(Node *lv, Node *n2)
 {
-  /*TODO*/
-  return n2->info;
+  int type = parseType(lv->info);
+  int cons = parseConstant(lv->info);
+
+  if (type == NUMTYPE)
+    yyerror("ERROR : Can only reserve memory for pointer types!");
+  if (cons)
+    yyerror("ERROR : Cannot alloc memory for constant variable!");
+}
+
+static int checkInvocation(char *id, Node *args)
+{
+  Node *params;
+  int idtype = IDfind(id, (void**) &params);
+
+  compareArgs(params, args);
+
+  return parseType(idtype);
+}
+
+static int compareArgs(Node *decl, Node *call)
+{
+  int i;
+
+  if (decl->attrib == ARGS && call->attrib == ARGS)
+    for (i = 0; i < decl->value.sub.num; i++) {
+      if (compareArgs(decl->value.sub.n[i], call->value.sub.n[i]) != 0)
+        return -1;
+      if (call->info != decl->info) {
+        yyerror("ERROR : Argument type mismatch in function call!");
+        return -1;
+      }
+    }
+  else if (decl->attrib == ARGS) {
+    yyerror("ERROR : Missing arguments in function call!");
+    return -1;
+  }
+  else if (call->attrib == ARGS) {
+    yyerror("ERROR : Too many arguments in function call!");
+    return -1;
+  }
+  return 0;
+}
+
+static void checkIfExpr(Node *n1)
+{
+  if (n1->info == VOID) 
+    yyerror("ERROR : Conditional expression must return an integer!");
+}
+
+static void checkForExpr(Node *n1, Node *n2, Node *n3)
+{
+  if (n1->info == VOID)
+    yyerror("ERROR : First expression in cycle must return an integer!");
+  if (n2->info == VOID)
+    yyerror("ERROR : Stop condition in cycle must return an integer!");
+  if (n3->info == VOID)
+    yyerror("ERROR : Step condition in cycle must return an integer!");
 }
 
 static int checkIndexation(char *id, Node *offset)
 {
-  if (IDfind(id, 0) == NUMTYPE)
+  int idtype = IDfind(id, 0);
+
+  if (parseType(idtype) == NUMTYPE)
     yyerror("ERROR : Cannot index an integer!");
-  if (offset->info != NUMTYPE)
+  else if (offset->info != NUMTYPE)
     yyerror("ERROR : Offset must be an integer!");
   return NUMTYPE;
 }
 
-static int checkAddress(Node *n1)
+static int checkAddress(Node *lv)
 {
-  if (n1->info != NUMTYPE)
+  if (parseType(lv->info) != NUMTYPE)
     yyerror("ERROR : Can only read address of integer types!");
   return ARRTYPE;
 }
 
-static int checkAssociation(Node *n1, Node *n2)
+static int checkAssociation(Node *lv, Node *n1)
 {
-  if (n1->info != n2->info && !is_null)
-    yyerror("ERROR : Association of diferent types!");
-  return n1->info;
+  int type = parseType(lv->info);
+  int cons = parseConstant(lv->info);
+
+  if (type != n1->info && !not_null)
+    yyerror("ERROR : Association between different types!");
+  if (cons)
+    yyerror("ERROR : Cannot assign a value to a constant variable!");
+  return type;
 }
 
 static int checkIfInt(Node *n1)
 {
   if (n1->info != NUMTYPE)
-    yyerror("ERROR : Operation apllies only to integers!");
+    yyerror("ERROR : Operation applies only to integers!");
+  return NUMTYPE;
+}
+
+static int checkSumOp(Node *n1, Node *n2)
+{
+  if (n1->info == STRTYPE || n2->info == STRTYPE)
+    yyerror("ERROR : Sum operation does not apply to string values!");
+  else if (n1->info == ARRTYPE && n2->info == ARRTYPE)
+    yyerror("ERROR : Cannot sum to vector types!");
+  return NUMTYPE;
+}
+
+static int checkSubOp(Node *n1, Node *n2)
+{
+  if (n1->info == STRTYPE || n2->info == STRTYPE)
+    yyerror("ERROR : Subtraction does not apply to string values!");
   return NUMTYPE;
 }
 
@@ -316,13 +607,12 @@ static int checkIntOp(Node *n1, Node *n2)
 {
   if (n1->info != NUMTYPE || n2->info != NUMTYPE)
     yyerror("ERROR : Operation must be between integers!");
-  return NUMTYPE;
+  return NUMTYPE; 
 }
 
 static int checkCompOp(Node *n1, Node *n2)
 {
-  if ((n1->info == NUMTYPE && n2->info == NUMTYPE) || (n1->info == STRTYPE && n2->info == NUMTYPE))
-    return NUMTYPE;
-  yyerror("ERROR : Comparison must be between two integers or two strings!");
-  return 0;
+  if ((n1->info != NUMTYPE || n2->info != NUMTYPE) && (n1->info != STRTYPE || n2->info != NUMTYPE))
+    yyerror("ERROR : Comparison must be between two integers or two strings!");
+  return NUMTYPE;
 }
