@@ -1,19 +1,20 @@
-/* $Id: tabid.h,v 1.2 2013/01/22 17:52:56 prs Exp $ */
+/* $Id: tabid.h,v 1.3 2019/05/28 15:24:56 prs Exp $ */
 #ifndef _TABID_H_
 #define _TABID_H_
 
-typedef int (*IDfunc)(int,char*,long,long);
+typedef int (*IDfunc)(int,char*,void*,void*);
 void   *IDroot(void *swap);
 void	IDpop(void),
 	IDpush(void),
 	IDclear(void),
 	IDprint(int,int);
-int	IDnew(int,char*,long),
-	IDreplace(int,char*,long),
-	IDinsert(int,int,char*,long),
-	IDfind(char*,long*),
-	IDsearch(char*,long*,int,int),
-	IDforall(IDfunc,long,int,int),
+int	IDnew(int,char*,void*),
+	IDreplace(int,char*,void*),
+	IDchange(int,char*,void*,int),
+	IDinsert(int,int,char*,void*),
+	IDfind(char*,void**),
+	IDsearch(char*,void**,int,int),
+	IDforall(IDfunc,void*,int,int),
 	IDlevel(void);
 
 extern int IDdebug; /* set to 1 to get debug message in stdout */
