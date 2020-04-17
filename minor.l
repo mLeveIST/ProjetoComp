@@ -1,5 +1,10 @@
- /* */
 %{
+/* -----------------------------------------
+ * Compiladores 19/20 - Entrega Intermedia
+ * Author: Miguel Levezinho, No 90756
+ * -----------------------------------------
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +40,7 @@ WSP [ \n\t\r]
 <IN_COM>\$                 BEGIN IN_CODE;
 <IN_COM>.|\n               ;
 
-<IN_CODE>{
+<IN_CODE>{                 /* Region to match code tokens */
 
 \$\$.*                     ;               /* Line comment */
 \$                         BEGIN IN_COM;   /* Block comment */
@@ -93,7 +98,7 @@ WSP [ \n\t\r]
 
 }
 
-<IN_STR>{
+<IN_STR>{                  /* Region to match string literals */
 
 \"                         { BEGIN IN_CODE; return STR; }
 \\n                        strcat(yylval.s, "\n");
@@ -126,6 +131,9 @@ char *convert_hexa(char *s)
   return s;
 }
 
+/* Takes in a string that represents a char
+ * and parses an actual char from it.
+ */
 int parse_char(char *s)
 {
   if (strlen(s) == 0)
@@ -150,6 +158,9 @@ int parse_char(char *s)
   return 0;
 }
 
+/* Takes in a string that represents a decimal number
+ * and parses an actual integer from it.
+ */
 int parse_decimal(char *s)
 {
   int num = strtol(s, 0, 0);
@@ -160,6 +171,9 @@ int parse_decimal(char *s)
   return num;
 }
 
+/* Takes in a string that represents an ocal integer number
+ * and parses an actual integer from it.
+ */
 int parse_octal(char *s)
 {
   int i, num = 0, aux = 0;
@@ -168,7 +182,6 @@ int parse_octal(char *s)
     if (s[i] >= '0' && s[i] <= '7')
       aux = aux * 8 + s[i] - '0';
     else
-      /* ERROR in use of function */
       yyerror("ERROR : Invalid octal number!");
 
     if (aux < num) {
@@ -180,6 +193,9 @@ int parse_octal(char *s)
   return num;
 }
 
+/* Takes in a string that represents an hexadecimal integer number
+ * and parses an actual integer from it.
+ */
 int parse_hexa(char *s)
 {
   int i, num = 0, aux = 0;
@@ -192,7 +208,6 @@ int parse_hexa(char *s)
     else if (s[i] >= 'a' && s[i] <= 'f')
       aux = aux * 16 + 10 + s[i] - 'a';
     else
-      /* ERROR in use of function */
       yyerror("ERROR : Invalid hexadecimal number!");
 
     if (aux < num) {
@@ -204,6 +219,9 @@ int parse_hexa(char *s)
   return num;
 }
 
+/* Takes in a string that represents a binary integer number
+ * and parses an actual integer from it.
+ */
 int parse_binary(char *s)
 {
   int i, num = 0, aux = 0;
@@ -212,7 +230,6 @@ int parse_binary(char *s)
     if (s[i] == '0' || s[i] == '1')
       aux = aux * 2 + s[i] - '0';
     else
-      /* ERROR in use of function */
       yyerror("ERROR : Invalid binary number!");
 
     if (aux < num) {

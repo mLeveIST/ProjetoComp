@@ -1,4 +1,10 @@
 %{
+/* -----------------------------------------
+ * Compiladores 19/20 - Entrega Intermedia
+ * Author: Miguel Levezinho, No 90756
+ * -----------------------------------------
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +47,6 @@ static int checkIntOp(Node *n1, Node *n2);
 static int checkCompOp(Node *n1, Node *n2);
 
 int for_lvl;
-int qualifier, constant;
 int not_null;
 int func_type;
 int lstSize;
