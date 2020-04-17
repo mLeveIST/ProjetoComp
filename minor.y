@@ -36,22 +36,43 @@ static int checkInvocation(char *id, Node *n2);
 static int compareArgs(Node *decl, Node *call, int sigErr);
 static void checkPrint(Node *n);
 static void checkAllocation(Node *n1, Node *n2);
-static int checkSumOp(Node *n1, Node *n2);
-static int checkSubOp(Node *n1, Node *n2);
 static int checkAddress(Node *n1);
 static int checkAssociation(Node *n1, Node *n2);
 static int checkInvocation(char *id, Node *n2);
 static int checkIndexation(char *id, Node *offset);
 static int checkIfInt(Node *n1);
+static int checkSumOp(Node *n1, Node *n2);
+static int checkSubOp(Node *n1, Node *n2);
 static int checkIntOp(Node *n1, Node *n2);
 static int checkCompOp(Node *n1, Node *n2);
 
+/* 0 if not inside a for loop ;
+ * > 0 for each time the program enters a for block
+ * Used to assure proper use of STOP and REPEAT.
+ */
 int for_lvl;
+
+/* Specifies if the last read literal was not the null pointer
+ * Used mostly in association logic verifications.
+ */
 int not_null;
+
+/* Stores the curr function type,
+ * used to match later with return statement.
+ */
 int func_type;
+
+/* List size, to store the size of chains/array of literals
+ * that are read (can be one if only one literal is read)
+ * Used mostly in declaration semantic verifications.
+ */
 int lstSize;
 
+/* Used to store latest read ID value, for semantic
+ * error checking in declarations.
+ */
 Node *auxPtr;
+
 %}
 
 %union {
@@ -87,26 +108,36 @@ Node *auxPtr;
 %type <n> insts inst elifs block endinst retn
 %type <n> expr leftv args lits numlst litlst
 
-%token NIL ERR DECLS DECL VARS VAR LIT_EXP LEFT_VAL ARGS CALL
+%token NIL ERR DECLS DECL VARS VAR LEFT_VAL ARGS CALL
 %token BODY BODY_VARS ARRAY INSTS BLOCK ALLOC IFELSE CONDT RANGE
 %token MODIFIERS LVAL FTYPE DVAL FBODY FHEAD VVAL FVAL
 
 %%
 
-file : prog                   { if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1); }
-     | modl                   { if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1); }
+/* Node tree construction uses only up to binary nodes */
+
+file : prog                   { if (errors == 0) printNode($1, 0, (char**) yyname); freeNode($1); }
+     | modl                   { if (errors == 0) printNode($1, 0, (char**) yyname); freeNode($1); }
      ;
 
+/* program */
+
 prog : PROG opdecls START     { IDpush(); func_type = NUMTYPE; }
-     body END                 { IDpop(); $$ = binNode(PROG, $2, $4); }
+       body END               { IDpop(); $$ = binNode(PROG, $2, binNode(START, $5, nilNode(END))); }
      ;
+
+/* module */
 
 modl : MODL opdecls END       { $$ = uniNode(MODL, $2); }
      ;
 
+/* optional declarations */
+
 opdecls :                     { $$ = nilNode(NIL); }
         | decls               { $$ = $1; }
         ;
+
+/* declarations (error recovery point) */
 
 decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
       | error                 { $$ = binNode(DECLS, nilNode(NIL), nilNode(ERR)); }
@@ -114,36 +145,52 @@ decls : decl                  { $$ = binNode(DECLS, nilNode(NIL), $1); }
       | decls ';' error       { $$ = binNode(DECLS, $1, nilNode(ERR)); }
       ;
 
+/* declaration */
+
 decl : func                          { $$ = $1; }
      | qualf cons var declval        { $$ = declNode($1, $2, $3, $4); }
      ;
+
+/* declaration value */
 
 declval :                     { $$ = nilNode(NIL); }
         | ASSOC lits          { $$ = $2; }
         ;
 
+/* function */
+
 func : FUNC fhead fbody       { $$ = binNode(FUNC, $2, $3); IDpop(); func_type = 0;
                                 checkFuncForward($2->info, $3->info); }
      ;
+
+/* function body */
 
 fbody : DONE                  { $$ = nilNode(DONE);
                                 $$->info = DONE; }
       | DO body retn          { $$ = binNode(FBODY, $2, $3); } 
       ;
 
+/* function signature (IDnew is called during reduction here) */
+
 fhead : qualf ftype ID        { IDpush(); func_type = $2->info; }
         params                { $$ = funcNode($1, $2, $3, $5);
                                 $$->info = $1->info; }
       ;
+
+/* function type (adds VOID to type) */
 
 ftype : VOID                  { $$ = nilNode(VOID);
                                 $$->info = VOID; }
       | type                  { $$ = $1; }
       ;
 
+/* function parameters */
+
 params :                      { $$ = nilNode(NIL); }
        | vars                 { $$ = $1; }
        ;
+
+/* variables (IDnew is called during reduction here) */
 
 vars : var                    { $$ = binNode(ARGS, nilNode(NIL), $1);
                                 $$->info = $1->info; declareVar($1); }
@@ -151,13 +198,19 @@ vars : var                    { $$ = binNode(ARGS, nilNode(NIL), $1);
                                 $$->info = $3->info; declareVar($3); }
      ;
 
+/* variable */
+
 var : type ID dim             { $$ = varNode($1, $2, $3); }
     ;
+
+/* dimension of variable (for arrays) */
 
 dim :                         { $$ = nilNode(NIL); }
     | '[' NUM ']'             { $$ = intNode(NUM, $2);
                                 $$->info = $2; }
     ;
+
+/* qualifier */
 
 qualf :                       { $$ = nilNode(NIL);
                                 $$->info = 0; }
@@ -167,11 +220,15 @@ qualf :                       { $$ = nilNode(NIL);
                                 $$->info = FRWD; }
       ;
 
+/* constant */
+
 cons :                        { $$ = nilNode(NIL);
                                 $$->info = 0; }
      | CONS                   { $$ = nilNode(CONS);
                                 $$->info = CONS; }
      ;
+
+/* variable types */
 
 type : NUMTYPE                { $$ = nilNode(NUMTYPE);
                                 $$->info = NUMTYPE; }
@@ -181,10 +238,14 @@ type : NUMTYPE                { $$ = nilNode(NUMTYPE);
                                 $$->info = ARRTYPE; }
      ;
 
+/* literals */
+
 lits : numlst                 { $$ = $1;
                                 $$->info = ARRTYPE; }
      | litlst                 { $$ = $1; }
      ;
+
+/* number list (array) */
 
 numlst : NUM ',' NUM          { $$ = binNode(ARRAY, intNode(NUM, $1), intNode(NUM, $3));
                                 lstSize = 2; not_null = 1; }
@@ -192,11 +253,15 @@ numlst : NUM ',' NUM          { $$ = binNode(ARRAY, intNode(NUM, $1), intNode(NU
                                 ++lstSize; }
        ;
 
+/* literal list (number or string) */
+
 litlst : lit                  { $$ = binNode(LVAL, nilNode(NIL), $1);
                                 $$->info = $1->info; lstSize = 1; }
        | litlst lit           { $$ = binNode(LVAL, $1, $2);
                                 $$->info = STRTYPE; ++lstSize; }
        ;
+
+/* individual literal */
 
 lit : NUM                     { $$ = intNode(NUM, $1);
                                 $$->info = NUMTYPE; not_null = $1; }
@@ -206,18 +271,26 @@ lit : NUM                     { $$ = intNode(NUM, $1);
                                 $$->info = STRTYPE; not_null = 1; }
     ;
 
+/* body (for functions including main ) */
+
 body : bvars insts            { $$ = binNode(BODY, $1, $2); }
      ;
+
+/* body variables */
 
 bvars :                       { $$ = nilNode(NIL); }
       | bvars var ';'         { $$ = binNode(BODY_VARS, $1, $2);
                                 declareVar($2); }
       ;
 
+/* instructions (error recovery point) */
+
 insts :                       { $$ = nilNode(NIL); }
       | insts inst            { $$ = binNode(INSTS, $1, $2); }
       | insts error           { $$ = binNode(INSTS, $1, nilNode(ERR)); }
       ;
+
+/* instruction */
 
 inst : IF expr THEN block elifs FI                { $$ = binNode(IF, binNode(CONDT, $2, $4), $5);
                                                     checkIfExpr($2); }
@@ -233,77 +306,91 @@ inst : IF expr THEN block elifs FI                { $$ = binNode(IF, binNode(CON
                                                     checkAllocation($1, $3);}
      ;
 
+/* elif instruction */
+
 elifs :                                   { $$ = nilNode(NIL); }
       | elifs ELIF expr THEN block        { $$ = binNode(ELIF, $1, binNode(CONDT, $3, $5));
                                             checkIfExpr($3); }
       ;
 
-block : insts endinst                      { $$ = binNode(BLOCK, $1, $2); }
+/* block (inside ifs or for loops) */
+
+block : insts endinst             { $$ = binNode(BLOCK, $1, $2); }
       ;
 
-endinst : retn                             { $$ = $1; }
-        | REP                              { $$ = nilNode(REP); checkInFor(); }
-        | STOP                             { $$ = nilNode(STOP); checkInFor(); }
+/* ending instructions (for blocks) */
+
+endinst : retn                    { $$ = $1; }
+        | REP                     { $$ = nilNode(REP); checkInFor(); }
+        | STOP                    { $$ = nilNode(STOP); checkInFor(); }
         ;
 
-retn :                                    { $$ = nilNode(NIL); }
-     | RETN                               { $$ = uniNode(RETN, nilNode(NIL));
-                                            $$->info = checkReturn(0); }
-     | RETN expr                          { $$ = uniNode(RETN, $2);
-                                            $$->info = checkReturn($2); }
+/* optional return instruction (no flow control) */
+
+retn :                            { $$ = nilNode(NIL); }
+     | RETN                       { $$ = uniNode(RETN, nilNode(NIL));
+                                    $$->info = checkReturn(0); }
+     | RETN expr                  { $$ = uniNode(RETN, $2);
+                                    $$->info = checkReturn($2); }
      ;
 
-expr : leftv                              { $$ = $1;
-                                            $$->info = parseType($1->info); }
-     | litlst                             { $$ = $1; }
-     | '(' expr ')'                       { $$ = $2; }
-     | ID '(' args ')'                    { $$ = binNode(CALL, strNode(ID, $1), $3);
-                                            $$->info = checkInvocation($1, $3); }
-     | '?'                                { $$ = nilNode('?');
-                                            $$->info = NUMTYPE; }
-     | '&' leftv %prec ADDR               { $$ = uniNode(ADDR, $2);
-                                            $$->info = checkAddress($2); }
-     | '-' expr %prec UMINUS              { $$ = uniNode(UMINUS, $2);
-                                            $$->info = checkIfInt($2); }
-     | expr '^' expr                      { $$ = binNode('^', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
-     | expr '*' expr                      { $$ = binNode('*', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
-     | expr '/' expr                      { $$ = binNode('/', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
-     | expr '%' expr                      { $$ = binNode('%', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
-     | expr '+' expr                      { $$ = binNode('+', $1, $3);
-                                            $$->info = checkSumOp($1, $3); }
-     | expr '-' expr                      { $$ = binNode('-', $1, $3);
-                                            $$->info = checkSubOp($1, $3); }
-     | expr '<' expr                      { $$ = binNode('<', $1, $3);
-                                            $$->info = checkCompOp($1, $3); }
-     | expr '>' expr                      { $$ = binNode('>', $1, $3);
-                                            $$->info = checkCompOp($1, $3); }
-     | expr LE expr                       { $$ = binNode(LE, $1, $3);
-                                            $$->info = checkCompOp($1, $3); }
-     | expr GE expr                       { $$ = binNode(GE, $1, $3);
-                                            $$->info = checkCompOp($1, $3); }
-     | expr '=' expr                      { $$ = binNode('=', $1, $3);
-                                            $$->info = checkCompOp($1, $3); }
-     | expr NE expr                       { $$ = binNode(NE, $1, $3);
-                                            $$->info = checkCompOp($1, $3); }
-     | '~' expr                           { $$ = uniNode('~', $2);
-                                            $$->info = checkIfInt($2); }
-     | expr '&' expr                      { $$ = binNode('&', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
-     | expr '|' expr                      { $$ = binNode('|', $1, $3);
-                                            $$->info = checkIntOp($1, $3); }
-     | leftv ASSOC expr                   { $$ = binNode(ASSOC, $1, $3);
-                                            $$->info = checkAssociation($1, $3); }
+/* expression */
+
+expr : leftv                      { $$ = $1;
+                                    $$->info = parseType($1->info); }
+     | litlst                     { $$ = $1; }
+     | '(' expr ')'               { $$ = $2; }
+     | ID '(' args ')'            { $$ = binNode(CALL, strNode(ID, $1), $3);
+                                    $$->info = checkInvocation($1, $3); }
+     | '?'                        { $$ = nilNode('?');
+                                    $$->info = NUMTYPE; }
+     | '&' leftv %prec ADDR       { $$ = uniNode(ADDR, $2);
+                                    $$->info = checkAddress($2); }
+     | '-' expr %prec UMINUS      { $$ = uniNode(UMINUS, $2);
+                                    $$->info = checkIfInt($2); }
+     | expr '^' expr              { $$ = binNode('^', $1, $3);
+                                    $$->info = checkIntOp($1, $3); }
+     | expr '*' expr              { $$ = binNode('*', $1, $3);
+                                    $$->info = checkIntOp($1, $3); }
+     | expr '/' expr              { $$ = binNode('/', $1, $3);
+                                    $$->info = checkIntOp($1, $3); }
+     | expr '%' expr              { $$ = binNode('%', $1, $3);
+                                    $$->info = checkIntOp($1, $3); }
+     | expr '+' expr              { $$ = binNode('+', $1, $3);
+                                    $$->info = checkSumOp($1, $3); }
+     | expr '-' expr              { $$ = binNode('-', $1, $3);
+                                    $$->info = checkSubOp($1, $3); }
+     | expr '<' expr              { $$ = binNode('<', $1, $3);
+                                    $$->info = checkCompOp($1, $3); }
+     | expr '>' expr              { $$ = binNode('>', $1, $3);
+                                    $$->info = checkCompOp($1, $3); }
+     | expr LE expr               { $$ = binNode(LE, $1, $3);
+                                    $$->info = checkCompOp($1, $3); }
+     | expr GE expr               { $$ = binNode(GE, $1, $3);
+                                    $$->info = checkCompOp($1, $3); }
+     | expr '=' expr              { $$ = binNode('=', $1, $3);
+                                    $$->info = checkCompOp($1, $3); }
+     | expr NE expr               { $$ = binNode(NE, $1, $3);
+                                    $$->info = checkCompOp($1, $3); }
+     | '~' expr                   { $$ = uniNode('~', $2);
+                                    $$->info = checkIfInt($2); }
+     | expr '&' expr              { $$ = binNode('&', $1, $3);
+                                    $$->info = checkIntOp($1, $3); }
+     | expr '|' expr              { $$ = binNode('|', $1, $3);
+                                    $$->info = checkIntOp($1, $3); }
+     | leftv ASSOC expr           { $$ = binNode(ASSOC, $1, $3);
+                                    $$->info = checkAssociation($1, $3); }
      ;
+
+/* left-value */
 
 leftv : ID                  { $$ = binNode(LEFT_VAL, strNode(ID, $1), nilNode(NIL));
                               $$->info = IDfind($1, 0); }
       | ID '[' expr ']'     { $$ = binNode(LEFT_VAL, strNode(ID, $1), $3);
                               $$->info = checkIndexation($1, $3); }
       ;
+
+/* arguments (to call function) */
 
 args : expr                 { $$ = binNode(ARGS, nilNode(NIL), $1);
                               $$->info = $1->info; }
@@ -320,9 +407,9 @@ char **yynames =
   0;
 #endif
 
-/* Return parse tree branch that represents a partial declaration of a
- * global variable.
- * Verifies use of dimension declaration.
+/* Return parse tree branch that represents a partial
+ * declaration of a global variable.
+ * Checks the proper use of the dimension declaration.
  */
 static Node *varNode(Node *type, char *id, Node *dim)
 {
@@ -342,8 +429,11 @@ static Node *varNode(Node *type, char *id, Node *dim)
 }
 
 /* Return parse tree branch that represents a global variable declaration.
- * Adds an entry in the symbol table for this variable only if the
- * declaration is valid. If not, throws an error.
+ * Also adds an entry in the symbol table for this variable only if the
+ * declaration is valid.
+ * If not, can throw multiple errors depending on what failed.
+ *
+ * Errors are throw depending on priority, and only one is thrown!
  */
 static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
 {
@@ -393,7 +483,9 @@ static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
 }
 
 /* Function that creates an entry in the symbol table for the passed
- * variable. May throw an error if the variable is already defined.
+ * variable (for the case os parameters and body variables).
+ * May throw an error if the variable is already defined and no
+ * overriding is available.
  */
 static void declareVar(Node *var)
 {
@@ -412,13 +504,12 @@ static void declareVar(Node *var)
 
 /* Return parse tree branch that represents a function declaration.
  * Adds an entry in the symbol table for this function only if the
- * declaration is valid. If not, throws an error.
+ * declaration is valid. If not, throws an error depending on what went wrong.
  */
 static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params)
 {
   Node *attrib;
-  int idtype;
-  int qualifier;
+  int idtype, qualifier;
 
   if ((idtype = IDsearch(id, (void**) IDtest, 1, 1)) != -1) {
     if (parseFunction(idtype) != FUNC)
@@ -455,7 +546,7 @@ static void checkFuncForward(int forward, int done)
 }
 
 /* Formats information about the declaration of a variable into 6 bits,
- * called the idtype.
+ * called the idtype, to store as the ID in the symbol table.
  * From less to most significative:
  * - 1 bit to store if ID representes a function or a variable
  * - 1 bit to store if the declaration is constant
@@ -473,9 +564,7 @@ static int formatType(int type, int qualifier, int constant, int function)
     case NUMTYPE: idtype = 1; break;
     case ARRTYPE: idtype = 2; break;
     case STRTYPE: idtype = 3; break;
-    default:
-      yyerror("ERROR : Invalid type!");
-      return -1;
+    default: return -1;
   }
   idtype = idtype << 2;
 
@@ -483,9 +572,7 @@ static int formatType(int type, int qualifier, int constant, int function)
     case 0: break;
     case PUBL: idtype += 1; break;
     case FRWD: idtype += 2; break;
-    default:
-      yyerror("ERROR : Invalid qualifier!");
-      return -1;
+    default: return -1;
   }
   idtype = (idtype << 1) + (constant ? 1 : 0);
 
@@ -504,10 +591,8 @@ static int parseType(int idtype)
     case 1: return NUMTYPE;
     case 2: return ARRTYPE;
     case 3: return STRTYPE;
-    default:
-      yyerror("ERROR : Invalid idtype, cannot filter type!");
+    default: return -1;
   }
-  return -1;
 }
 
 /* Recovers the qualifier of an ID from the idtype.
@@ -521,11 +606,8 @@ static int parseQualifier(int idtype)
     case 0: return 0;
     case 1: return PUBL;
     case 2: return FRWD;
-    default:
-      yyerror("ERROR : Invalid idtype, cannot filter qualifier!");
-      printf(":%d:\n", idtype);
+    default: return -1;
   }
-  return -1;
 }
 
 /* Recovers from the idtype if the ID is constant.
@@ -538,11 +620,8 @@ static int parseConstant(int idtype)
   switch ((idtype >> 1) & 33) {
     case 0: return 0;
     case 1: return CONS;
-    default:
-      yyerror("ERROR : Invalid idtype, cannot filter constant!");
-      printf(":%d:\n", idtype);
+    default: return -1;
   }
-  return -1;
 }
 
 /* Recovers the from the idtype if the ID is from a function.
@@ -555,13 +634,13 @@ static int parseFunction(int idtype)
   switch (idtype & 65) {
     case 0: return 0;
     case 1: return FUNC;
-    default:
-      yyerror("ERROR : Invalid idtype, cannot filter function!");
-      printf(":%d:\n", idtype);
+    default: return -1;
   }
-  return -1;
 }
 
+/* Check function that verifies if the return expression type
+ * is the same as the type declared in the function signature.
+ */
 static int checkReturn(Node *n)
 {
   if (n == 0 && func_type != VOID) {
@@ -581,18 +660,27 @@ static int checkReturn(Node *n)
   return n == 0 ? VOID : n->info;
 }
 
+/* Check function that verifies if the proper use of
+ * STOP and REPEAT operations, inside a for loop.
+ */
 static void checkInFor()
 {
   if (!for_lvl)
     yyerror("ERROR : Can only use instruction inside for loop!");
 }
 
+/* Check function that verifies that the passed expression
+ * can be printed by the ! instruction.
+ */
 static void checkPrint(Node *n)
 {
   if (n->info == VOID)
     yyerror("ERROR : Cannot print void expression!");
 }
 
+/* Check function that verifies the proper types and
+ * qualities of variables to be able to reserve memory.
+ */
 static void checkAllocation(Node *lv, Node *n2)
 {
   int type = parseType(lv->info);
@@ -604,6 +692,11 @@ static void checkAllocation(Node *lv, Node *n2)
     yyerror("ERROR : Cannot alloc memory for constant variable!");
 }
 
+/* Verifies the correctness and completeness of a function
+ * invocation, in terms of type and arguments.
+ * Uses the compareArgs function to compare
+ * declared parameters and call arguments.
+ */
 static int checkInvocation(char *id, Node *args)
 {
   Node *params;
@@ -617,6 +710,11 @@ static int checkInvocation(char *id, Node *args)
   return parseType(idtype);
 }
 
+/* Function that moves down recursively through two sub-trees
+ * of function arguments (ARGS) and checks if they are of the
+ * same size and type.
+ * sigErr is a flag to enable/disable error throwing during the search.
+ */
 static int compareArgs(Node *decl, Node *call, int sigErr)
 {
   int i;
@@ -641,12 +739,16 @@ static int compareArgs(Node *decl, Node *call, int sigErr)
   return 0;
 }
 
+/* Check function of the expressions used in conditional if and elif.
+ */
 static void checkIfExpr(Node *n1)
 {
   if (n1->info == VOID) 
     yyerror("ERROR : Conditional expression must return an integer!");
 }
 
+/* Check function of the expressions used in for cycles.
+ */
 static void checkForExpr(Node *n1, Node *n2, Node *n3)
 {
   if (n1->info == VOID)
@@ -657,6 +759,9 @@ static void checkForExpr(Node *n1, Node *n2, Node *n3)
     yyerror("ERROR : Step condition in cycle must return an integer!");
 }
 
+/* Check function that verifies proper indexation of variables.
+ * Index of a function is not allowed in this implementation.
+ */
 static int checkIndexation(char *id, Node *offset)
 {
   int idtype = IDfind(id, 0);
@@ -670,6 +775,9 @@ static int checkIndexation(char *id, Node *offset)
   return NUMTYPE;
 }
 
+/* Check function that verifies proper use the
+ * memory read operator.
+ */
 static int checkAddress(Node *lv)
 {
   if (parseType(lv->info) != NUMTYPE)
@@ -677,6 +785,11 @@ static int checkAddress(Node *lv)
   return ARRTYPE;
 }
 
+/* Check function that verifies proper use the association
+ * expression.
+ * Uses the not_null global var to check cases of null pointer
+ * assignment to array or string types.
+ */
 static int checkAssociation(Node *lv, Node *n1)
 {
   int type;
@@ -694,6 +807,9 @@ static int checkAssociation(Node *lv, Node *n1)
   return type;
 }
 
+/* Check function to verify if the given expression results
+ * in a type integer.
+ */
 static int checkIfInt(Node *n1)
 {
   if (n1->info != NUMTYPE)
@@ -701,6 +817,10 @@ static int checkIfInt(Node *n1)
   return NUMTYPE;
 }
 
+/* Check function to verify if the aritmetic sum is being used
+ * with the correct operands.
+ * Pointer aritmetic is allowed.
+ */
 static int checkSumOp(Node *n1, Node *n2)
 {
   if (n1->info == NUMTYPE && n2->info == NUMTYPE)
@@ -712,6 +832,10 @@ static int checkSumOp(Node *n1, Node *n2)
   return ARRTYPE;
 }
 
+/* Check function to verify if the subtraction is being used
+ * with the correct operands.
+ * Pointer aritmetic is allowed.
+ */
 static int checkSubOp(Node *n1, Node *n2)
 {
   if (n1->info == n2->info && n1->info != STRTYPE)
@@ -721,6 +845,8 @@ static int checkSubOp(Node *n1, Node *n2)
   return ARRTYPE;
 }
 
+/* Check function to verify if the operation is between integers.
+ */
 static int checkIntOp(Node *n1, Node *n2)
 {
   if (n1->info != NUMTYPE || n2->info != NUMTYPE)
@@ -728,6 +854,9 @@ static int checkIntOp(Node *n1, Node *n2)
   return NUMTYPE; 
 }
 
+/* Check function to verify if the comparison expresions
+ * are made only between integers and strings.
+ */
 static int checkCompOp(Node *n1, Node *n2)
 {
   if ((n1->info != NUMTYPE || n2->info != NUMTYPE) && (n1->info != STRTYPE || n2->info != STRTYPE))
