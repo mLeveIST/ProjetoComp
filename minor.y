@@ -10,26 +10,28 @@
 int yylex(), yyerror(char *s), yyparse();
 int errors;
 
-static int formatType(int type, int qualifier, int constant);
+static int formatType(int type, int qualifier, int constant, int function);
 static int parseType(int idtype);
 static int parseQualifier(int idtype);
 static int parseConstant(int idtype);
+static int parseFunction(int idtype);
 
 static Node *varNode(Node *type, char *id, Node *dim);
 static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval);
 static void declareVar(Node *var);
 static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params);
+static void checkFuncForward(int forward, int done);
 
 static int checkReturn(Node *n);
 static void checkIfExpr(Node *n1);
 static void checkInFor();
 static void checkForExpr(Node *n1, Node *n2, Node *n3);
 static int checkInvocation(char *id, Node *n2);
-static int compareArgs(Node *decl, Node *call);
+static int compareArgs(Node *decl, Node *call, int sigErr);
+static void checkPrint(Node *n);
 static void checkAllocation(Node *n1, Node *n2);
-static void declareVariable(Node *type, char *id, int dim);
-static void declareFunction(Node *n1, Node *n2, char *id);
-static int checkIntPOp(Node *n1, Node *n2);
+static int checkSumOp(Node *n1, Node *n2);
+static int checkSubOp(Node *n1, Node *n2);
 static int checkAddress(Node *n1);
 static int checkAssociation(Node *n1, Node *n2);
 static int checkInvocation(char *id, Node *n2);
@@ -86,12 +88,12 @@ Node *auxPtr;
 
 %%
 
-file : prog                   { /*if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1);*/ }
-     | modl                   { /*if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1);*/ }
+file : prog                   { if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1); }
+     | modl                   { if (errors > 0) printNode($1, 0, (char**) yyname); freeNode($1); }
      ;
 
-prog : PROG opdecls START     { func_type = NUMTYPE; }
-     body END                 { $$ = binNode(PROG, $2, $4); }
+prog : PROG opdecls START     { IDpush(); func_type = NUMTYPE; }
+     body END                 { IDpop(); $$ = binNode(PROG, $2, $4); }
      ;
 
 modl : MODL opdecls END       { $$ = uniNode(MODL, $2); }
@@ -115,15 +117,18 @@ declval :                     { $$ = nilNode(NIL); }
         | ASSOC lits          { $$ = $2; }
         ;
 
-func : FUNC fhead fbody       { $$ = binNode(FUNC, $2, $3); IDpop(); func_type = 0; }
+func : FUNC fhead fbody       { $$ = binNode(FUNC, $2, $3); IDpop(); func_type = 0;
+                                checkFuncForward($2->info, $3->info); }
      ;
 
-fbody : DONE                  { $$ = nilNode(DONE); }
+fbody : DONE                  { $$ = nilNode(DONE);
+                                $$->info = DONE; }
       | DO body retn          { $$ = binNode(FBODY, $2, $3); } 
       ;
 
 fhead : qualf ftype ID        { IDpush(); func_type = $2->info; }
-        params                { $$ = funcNode($1, $2, $3, $5); }
+        params                { $$ = funcNode($1, $2, $3, $5);
+                                $$->info = $1->info; }
       ;
 
 ftype : VOID                  { $$ = nilNode(VOID);
@@ -191,7 +196,7 @@ litlst : lit                  { $$ = binNode(LVAL, nilNode(NIL), $1);
 lit : NUM                     { $$ = intNode(NUM, $1);
                                 $$->info = NUMTYPE; not_null = $1; }
     | CHA                     { $$ = intNode(CHA, $1);
-                                $$->info = NUMTYPE; not_null = $1; }
+                                $$->info = NUMTYPE; not_null = 1; }
     | STR                     { $$ = strNode(STR, $1);
                                 $$->info = STRTYPE; not_null = 1; }
     ;
@@ -217,7 +222,8 @@ inst : IF expr THEN block elifs FI                { $$ = binNode(IF, binNode(CON
        block DONE                                 { $$ = binNode(FOR, binNode(RANGE, $2, binNode(DO, $4, $6)), $9);
                                                     for_lvl--; }
      | expr ';'                                   { $$ = $1; }
-     | expr '!'                                   { $$ = uniNode('!', $1); }
+     | expr '!'                                   { $$ = uniNode('!', $1);
+                                                    checkPrint($1); }
      | leftv '#' expr ';'                         { $$ = binNode(ALLOC, $3, $1);
                                                     checkAllocation($1, $3);}
      ;
@@ -247,8 +253,6 @@ expr : leftv                              { $$ = $1;
      | litlst                             { $$ = $1; }
      | '(' expr ')'                       { $$ = $2; }
      | ID '(' args ')'                    { $$ = binNode(CALL, strNode(ID, $1), $3);
-                                            $$->info = checkInvocation($1, $3); }
-     | ID '(' args ')' '[' expr ']'       { $$ = binNode(CALL, strNode(ID, $1), $3); /* Isto está mal, falta expr */
                                             $$->info = checkInvocation($1, $3); }
      | '?'                                { $$ = nilNode('?');
                                             $$->info = NUMTYPE; }
@@ -311,6 +315,10 @@ char **yynames =
   0;
 #endif
 
+/* Return parse tree branch that represents a partial declaration of a
+ * global variable.
+ * Verifies use of dimension declaration.
+ */
 static Node *varNode(Node *type, char *id, Node *dim)
 {
   Node *var = binNode(VAR, binNode(VVAL, type, auxPtr = strNode(ID, id)), dim);
@@ -330,7 +338,7 @@ static Node *varNode(Node *type, char *id, Node *dim)
 
 /* Return parse tree branch that represents a global variable declaration.
  * Adds an entry in the symbol table for this variable only if the
- * declaration is valid. If not, throws an error, but still builds the tree.
+ * declaration is valid. If not, throws an error.
  */
 static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
 {
@@ -347,10 +355,12 @@ static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
       else if ((qualifier = parseQualifier(idtype)) != FRWD)
         yyerror("ERROR : Cannot redefine not forwarded variable!");
       else {
-        idtype = formatType(var->info, qualif->info, cons->info);
+        idtype = formatType(var->info, qualif->info, cons->info, 0);
         IDchange(idtype, id, 0, 0);
       }
     }
+    else if (qualif->info == FRWD && declval->info != -1)
+      yyerror("ERROR : Forwarded variable cannot have a body!");
     else if ((dim = var->CHILD(1)->info) > 0 && dim < lstSize)
       yyerror("ERROR : Number of integers exceeds specified dimension for array!");
     else if (dim > 0 && lstSize == 1 && var->info == STRTYPE)
@@ -358,16 +368,18 @@ static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
     else if (qualif->info != FRWD && cons->info == CONS && declval->info == -1)
       yyerror("ERROR : Uninitialized constant variable!");
     else if (declval->info != -1 && dim < 1) {
-      if (var->info != NUMTYPE && !not_null)
+      if (var->info == ARRTYPE && dim == -1)
+        yyerror("ERROR : Connot initialize array that has no dimension!");
+      else if (var->info != NUMTYPE && !not_null)
         yyerror("ERROR : Declaration cannot be initialized with a null pointer!");
       else if (declval->info != var->info)
         yyerror("ERROR : Initialized value does not match declared variable type!");
       else
-        idtype = formatType(var->info, qualif->info, cons->info);
+        idtype = formatType(var->info, qualif->info, cons->info, 0);
         IDnew(idtype, id, 0);
     }
     else {
-      idtype = formatType(var->info, qualif->info, cons->info);
+      idtype = formatType(var->info, qualif->info, cons->info, 0);
       IDnew(idtype, id, 0);
     }
   }
@@ -375,43 +387,79 @@ static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
   return binNode(DECL, binNode(MODIFIERS, qualif, cons), binNode(DVAL, var, declval));
 }
 
+/* Function that creates an entry in the symbol table for the passed
+ * variable. May throw an error if the variable is already defined.
+ */
 static void declareVar(Node *var)
 {
   int idtype;
   char *id = auxPtr->value.s;
 
   if (var->info != -1) {
-    if ((idtype = IDfind(id, (void**) IDtest)) != -1)
-      IDreplace(formatType(var->info, 0, 0), id, 0);
+    if ((idtype = IDsearch(id, (void**) IDtest, 0, 1)) != -1)
+      yyerror("ERROR : Variable already defined within block!");
+    else if ((idtype = IDsearch(id, (void**) IDtest, 1, 1)) != -1)
+      IDreplace(formatType(var->info, 0, 0, 0), id, 0);
     else
-      IDnew(formatType(var->info, 0, 0), id, 0);
+      IDnew(formatType(var->info, 0, 0, 0), id, 0);
   }
 }
 
+/* Return parse tree branch that represents a function declaration.
+ * Adds an entry in the symbol table for this function only if the
+ * declaration is valid. If not, throws an error.
+ */
 static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params)
 {
-  void *attrib;
+  Node *attrib;
   int idtype;
   int qualifier;
 
-  if ((idtype = IDfind(id, (void**) IDtest)) != -1) {
-    if (IDfind(id, &attrib) && !attrib)
+  if ((idtype = IDsearch(id, (void**) IDtest, 1, 1)) != -1) {
+    if (parseFunction(idtype) != FUNC)
       yyerror("ERROR : Function name already taken by a variable!");
     else if ((qualifier = parseQualifier(idtype)) != FRWD)
       yyerror("ERROR : Cannot redefine not forwarded functions!");
+    else if (qualifier == FRWD) {
+      IDsearch(id, (void**) &attrib, 1, 1);
+      if (ftype->info != parseType(idtype))
+        yyerror("ERROR : Implementation of forward function has wrong type!");
+      else if (compareArgs(params, attrib, 0))
+        yyerror("ERROR : Implementation of forward function arguments do not match!");
+    }
     else
-      idtype = formatType(ftype->info, qualif->info, 0);
+      idtype = formatType(ftype->info, qualif->info, 0, 1);
       IDchange(idtype, id, (void *) params, 1);
   }
   else {
-    idtype = formatType(ftype->info, qualif->info, 0);
+    idtype = formatType(ftype->info, qualif->info, 0, 1);
     IDinsert(0, idtype, id, (void *) params);
   }
 
   return binNode(FHEAD, qualif, binNode(FTYPE, binNode(FVAL, ftype, strNode(ID, id)), params));
 }
 
-static int formatType(int type, int qualifier, int constant)
+/* Verifies if the declaration of a forward function is completed.
+ */
+static void checkFuncForward(int forward, int done)
+{
+  if (forward == FRWD && done != DONE)
+    yyerror("ERROR : Forwarded function cannot have a body!");
+  if (forward != FRWD && done == DONE)
+    yyerror("ERROR : Not fowarded function missing definition!");
+}
+
+/* Formats information about the declaration of a variable into 6 bits,
+ * called the idtype.
+ * From less to most significative:
+ * - 1 bit to store if ID representes a function or a variable
+ * - 1 bit to store if the declaration is constant
+ * - 2 bits to store the value of the qualifier
+ * - 2 bits to store the value of the type
+ * An aditional error bit may be used in parsing functions to determine
+ * if input is indeed a valid ID type.
+ */
+static int formatType(int type, int qualifier, int constant, int function)
 {
   int idtype = 0;
 
@@ -422,7 +470,7 @@ static int formatType(int type, int qualifier, int constant)
     case STRTYPE: idtype = 3; break;
     default:
       yyerror("ERROR : Invalid type!");
-      printf("%d:%d:%d\n", type, qualifier, constant);
+      return -1;
   }
   idtype = idtype << 2;
 
@@ -432,35 +480,39 @@ static int formatType(int type, int qualifier, int constant)
     case FRWD: idtype += 2; break;
     default:
       yyerror("ERROR : Invalid qualifier!");
-      printf("%d:%d:%d\n", type, qualifier, constant);
+      return -1;
   }
+  idtype = (idtype << 1) + (constant ? 1 : 0);
 
-  return (idtype << 1) + (constant ? 1 : 0); 
+  return (idtype << 1) + (function ? 1 : 0); 
 }
 
+/* Recovers the type of an ID from the idtype.
+ */
 static int parseType(int idtype)
 {
   if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
     return idtype;
 
-  switch (idtype >> 3) {
+  switch (idtype >> 4) {
     case 0: return VOID;
     case 1: return NUMTYPE;
     case 2: return ARRTYPE;
     case 3: return STRTYPE;
     default:
       yyerror("ERROR : Invalid idtype, cannot filter type!");
-      printf(":%d:\n", idtype);
   }
   return -1;
 }
 
+/* Recovers the qualifier of an ID from the idtype.
+ */
 static int parseQualifier(int idtype)
 {
   if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
     return 0;
 
-  switch ((idtype >> 1) & 3) {
+  switch ((idtype >> 2) & 19) {
     case 0: return 0;
     case 1: return PUBL;
     case 2: return FRWD;
@@ -471,16 +523,35 @@ static int parseQualifier(int idtype)
   return -1;
 }
 
+/* Recovers from the idtype if the ID is constant.
+ */
 static int parseConstant(int idtype)
 {
   if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
     return 0;
 
-  switch (idtype & 1) {
+  switch ((idtype >> 1) & 33) {
     case 0: return 0;
     case 1: return CONS;
     default:
       yyerror("ERROR : Invalid idtype, cannot filter constant!");
+      printf(":%d:\n", idtype);
+  }
+  return -1;
+}
+
+/* Recovers the from the idtype if the ID is from a function.
+ */
+static int parseFunction(int idtype)
+{
+  if (idtype == VOID || idtype == NUMTYPE || idtype == ARRTYPE || idtype == STRTYPE)
+    return 0;
+
+  switch (idtype & 65) {
+    case 0: return 0;
+    case 1: return FUNC;
+    default:
+      yyerror("ERROR : Invalid idtype, cannot filter function!");
       printf(":%d:\n", idtype);
   }
   return -1;
@@ -492,9 +563,15 @@ static int checkReturn(Node *n)
     yyerror("ERROR : Missing return expression!");
     return -1;
   }
-  else if (n != 0 && n->info != func_type) {
-    yyerror("ERROR : Return type does not match function type!");
-    return -1;
+  else if (n != 0) {
+    if (n->info == VOID) {
+      yyerror("ERROR : Invalid return type for function!");
+      return -1;
+    }
+    else if (n->info != func_type) {
+      yyerror("ERROR : Return type does not match function type!");
+      return -1;
+    }
   }
   return n == 0 ? VOID : n->info;
 }
@@ -503,6 +580,12 @@ static void checkInFor()
 {
   if (!for_lvl)
     yyerror("ERROR : Can only use instruction inside for loop!");
+}
+
+static void checkPrint(Node *n)
+{
+  if (n->info == VOID)
+    yyerror("ERROR : Cannot print void expression!");
 }
 
 static void checkAllocation(Node *lv, Node *n2)
@@ -521,30 +604,33 @@ static int checkInvocation(char *id, Node *args)
   Node *params;
   int idtype = IDfind(id, (void**) &params);
 
-  compareArgs(params, args);
+  if (parseFunction(idtype) != FUNC)
+    yyerror("ERROR : Cannot invoke ID that is not a function!");
+  else
+    compareArgs(params, args, 1);
 
   return parseType(idtype);
 }
 
-static int compareArgs(Node *decl, Node *call)
+static int compareArgs(Node *decl, Node *call, int sigErr)
 {
   int i;
 
   if (decl->attrib == ARGS && call->attrib == ARGS)
     for (i = 0; i < decl->value.sub.num; i++) {
-      if (compareArgs(decl->value.sub.n[i], call->value.sub.n[i]) != 0)
+      if (compareArgs(decl->value.sub.n[i], call->value.sub.n[i], sigErr) != 0)
         return -1;
       if (call->info != decl->info) {
-        yyerror("ERROR : Argument type mismatch in function call!");
+        if (sigErr) yyerror("ERROR : Argument type mismatch in function call!");
         return -1;
       }
     }
   else if (decl->attrib == ARGS) {
-    yyerror("ERROR : Missing arguments in function call!");
+    if (sigErr) yyerror("ERROR : Missing arguments in function call!");
     return -1;
   }
   else if (call->attrib == ARGS) {
-    yyerror("ERROR : Too many arguments in function call!");
+    if (sigErr) yyerror("ERROR : Too many arguments in function call!");
     return -1;
   }
   return 0;
@@ -570,7 +656,9 @@ static int checkIndexation(char *id, Node *offset)
 {
   int idtype = IDfind(id, 0);
 
-  if (parseType(idtype) == NUMTYPE)
+  if (parseFunction(idtype) == FUNC)
+    yyerror("ERROR : Cannot index a function!");
+  else if (parseType(idtype) == NUMTYPE)
     yyerror("ERROR : Cannot index an integer!");
   else if (offset->info != NUMTYPE)
     yyerror("ERROR : Offset must be an integer!");
@@ -586,13 +674,18 @@ static int checkAddress(Node *lv)
 
 static int checkAssociation(Node *lv, Node *n1)
 {
-  int type = parseType(lv->info);
-  int cons = parseConstant(lv->info);
+  int type;
 
-  if (type != n1->info && not_null)
-    yyerror("ERROR : Association between different types!");
-  if (cons)
+  if (lv->info == -1)
+    return -1;
+
+  if (parseFunction(lv->info) == FUNC)
+    yyerror("ERROR : Cannot assign a value to a function!");
+  else if (parseConstant(lv->info) == CONS)
     yyerror("ERROR : Cannot assign a value to a constant variable!");
+  else if ((type = parseType(lv->info)) != n1->info && not_null)
+    yyerror("ERROR : Association between different types!");
+  not_null = 1;
   return type;
 }
 
