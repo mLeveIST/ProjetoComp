@@ -17,6 +17,7 @@ static int parseConstant(int idtype);
 
 static Node *varNode(Node *type, char *id, Node *dim);
 static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval);
+static void declareVar(Node *var);
 static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params);
 
 static int checkReturn(Node *n);
@@ -135,9 +136,9 @@ params :                      { $$ = nilNode(NIL); }
        ;
 
 vars : var                    { $$ = binNode(ARGS, nilNode(NIL), $1);
-                                $$->info = $1->info; if ($1->info != -1) IDnew(formatType($1->info, 0, 0), auxPtr->value.s, 0); }
+                                $$->info = $1->info; declareVar($1); }
      | vars ';' var           { $$ = binNode(ARGS, $1, $3);
-                                $$->info = $3->info; if ($3->info != -1) IDnew(formatType($3->info, 0, 0), auxPtr->value.s, 0); }
+                                $$->info = $3->info; declareVar($3); }
      ;
 
 var : type ID dim             { $$ = varNode($1, $2, $3); }
@@ -200,7 +201,7 @@ body : bvars insts            { $$ = binNode(BODY, $1, $2); }
 
 bvars :                       { $$ = nilNode(NIL); }
       | bvars var ';'         { $$ = binNode(BODY_VARS, $1, $2);
-                                if ($2->info != -1) IDnew(formatType($2->info, 0, 0), auxPtr->value.s, 0); }
+                                declareVar($2); }
       ;
 
 insts :                       { $$ = nilNode(NIL); }
@@ -236,7 +237,7 @@ endinst : retn                             { $$ = $1; }
 
 retn :                                    { $$ = nilNode(NIL); }
      | RETN                               { $$ = uniNode(RETN, nilNode(NIL));
-                                            $$->info = checkReturn(NULL); }
+                                            $$->info = checkReturn(0); }
      | RETN expr                          { $$ = uniNode(RETN, $2);
                                             $$->info = checkReturn($2); }
      ;
@@ -352,12 +353,14 @@ static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
     }
     else if ((dim = var->CHILD(1)->info) > 0 && dim < lstSize)
       yyerror("ERROR : Number of integers exceeds specified dimension for array!");
+    else if (dim > 0 && lstSize == 1 && var->info == STRTYPE)
+      yyerror("ERROR : Arrays can only be initialized with integer sequences!");
     else if (qualif->info != FRWD && cons->info == CONS && declval->info == -1)
       yyerror("ERROR : Uninitialized constant variable!");
-    else if (declval->info != -1) {
+    else if (declval->info != -1 && dim < 1) {
       if (var->info != NUMTYPE && !not_null)
         yyerror("ERROR : Declaration cannot be initialized with a null pointer!");
-      else if ((dim > 0 && var->info == STRTYPE) || (dim < 1 && declval->info != var->info))
+      else if (declval->info != var->info)
         yyerror("ERROR : Initialized value does not match declared variable type!");
       else
         idtype = formatType(var->info, qualif->info, cons->info);
@@ -370,6 +373,19 @@ static Node *declNode(Node *qualif, Node *cons, Node *var, Node *declval)
   }
 
   return binNode(DECL, binNode(MODIFIERS, qualif, cons), binNode(DVAL, var, declval));
+}
+
+static void declareVar(Node *var)
+{
+  int idtype;
+  char *id = auxPtr->value.s;
+
+  if (var->info != -1) {
+    if ((idtype = IDfind(id, (void**) IDtest)) != -1)
+      IDreplace(formatType(var->info, 0, 0), id, 0);
+    else
+      IDnew(formatType(var->info, 0, 0), id, 0);
+  }
 }
 
 static Node *funcNode(Node *qualif, Node *ftype, char *id, Node *params)
@@ -472,15 +488,15 @@ static int parseConstant(int idtype)
 
 static int checkReturn(Node *n)
 {
-  if (n == NULL && func_type != VOID) {
+  if (n == 0 && func_type != VOID) {
     yyerror("ERROR : Missing return expression!");
     return -1;
   }
-  else if (n->info != func_type) {
+  else if (n != 0 && n->info != func_type) {
     yyerror("ERROR : Return type does not match function type!");
     return -1;
   }
-  return n->info;
+  return n == 0 ? VOID : n->info;
 }
 
 static void checkInFor()
@@ -573,7 +589,7 @@ static int checkAssociation(Node *lv, Node *n1)
   int type = parseType(lv->info);
   int cons = parseConstant(lv->info);
 
-  if (type != n1->info && !not_null)
+  if (type != n1->info && not_null)
     yyerror("ERROR : Association between different types!");
   if (cons)
     yyerror("ERROR : Cannot assign a value to a constant variable!");
@@ -589,18 +605,22 @@ static int checkIfInt(Node *n1)
 
 static int checkSumOp(Node *n1, Node *n2)
 {
-  if (n1->info == STRTYPE || n2->info == STRTYPE)
+  if (n1->info == NUMTYPE && n2->info == NUMTYPE)
+    return NUMTYPE;
+  else if (n1->info == STRTYPE || n2->info == STRTYPE)
     yyerror("ERROR : Sum operation does not apply to string values!");
   else if (n1->info == ARRTYPE && n2->info == ARRTYPE)
     yyerror("ERROR : Cannot sum to vector types!");
-  return NUMTYPE;
+  return ARRTYPE;
 }
 
 static int checkSubOp(Node *n1, Node *n2)
 {
-  if (n1->info == STRTYPE || n2->info == STRTYPE)
+  if (n1->info == n2->info && n1->info != STRTYPE)
+    return NUMTYPE;
+  else if (n1->info == STRTYPE || n2->info == STRTYPE)
     yyerror("ERROR : Subtraction does not apply to string values!");
-  return NUMTYPE;
+  return ARRTYPE;
 }
 
 static int checkIntOp(Node *n1, Node *n2)
@@ -612,7 +632,7 @@ static int checkIntOp(Node *n1, Node *n2)
 
 static int checkCompOp(Node *n1, Node *n2)
 {
-  if ((n1->info != NUMTYPE || n2->info != NUMTYPE) && (n1->info != STRTYPE || n2->info != NUMTYPE))
+  if ((n1->info != NUMTYPE || n2->info != NUMTYPE) && (n1->info != STRTYPE || n2->info != STRTYPE))
     yyerror("ERROR : Comparison must be between two integers or two strings!");
   return NUMTYPE;
 }
