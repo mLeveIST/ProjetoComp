@@ -1,28 +1,18 @@
-LANG=minor
-EXT=min# file extension: .$(EXT)
-LIB=lib# compiler library directory
-UTIL=util# compiler library: lib$(LIB).a
-CC=gcc
-CFLAGS=-g -DYYDEBUG
-AS=nasm -felf32
-LD=ld -m elf_i386
-LDLIBS=lib$(LANG).a
+minor: minor.y minor.l
+	make -C lib
+	byacc -dv minor.y
+	flex -dl minor.l
+	pburg -T minor.brg
+	gcc lex.yy.c y.tab.c yyselect.c -Ilib lib/node.o lib/tabid.o lib/main.o -o minor
+	make -C run
+	-cp run/libminor.a libminor.a
 
-$(LANG): $(LANG).y $(LANG).l $(LANG).brg
-	make -C $(LIB)
-	byacc -dv $(LANG).y
-	flex -dl $(LANG).l
-	pburg -T $(LANG).brg
-	$(LINK.c) -o $(LANG) $(ARCH) -I$(LIB) lex.yy.c y.tab.c yyselect.c -L$(LIB) -l$(UTIL)
-
-out: out.asm $(LANG)
-	$(AS) out.asm -o out.o
-	$(LD) out.o $(LDLIBS) -o out
-	./out
-
-arm::
-	$(MAKE) $(MFLAGS) CC=gcc ARCH='-DpfARM' RUN=arm AS=as LD=ld
+out:: out.asm minor
+	nasm -felf32 out.asm -o out.o
+	ld -m elf_i386 out.o libminor.a -o out
 
 clean::
-	make -C $(LIB) clean
-	rm -f *.o $(LANG) $(LDLIBS) lex.yy.c y.tab.c y.tab.h y.output yyselect.c *.asm *~
+	make -C lib clean
+	make -C run clean
+	make -C err clean
+	rm -f *.o minor libminor.a lex.yy.c y.tab.c y.tab.h yyselect.c y.output *.out *.asm *~
