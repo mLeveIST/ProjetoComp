@@ -1,0 +1,5 @@
+program
+  number var := 4
+start
+  var!
+end
