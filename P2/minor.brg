@@ -84,8 +84,6 @@ vardecl: STRING(ID, chars)              1 { /**/ }
 vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
 vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
 
-%! vdim qualif const type ftype
-
 chars: CHARS(NIL, char)                 1 { /**/ }
 chars: CHARS(chars, char)               1 { /**/ }
 
@@ -125,7 +123,7 @@ instrs: STMT(instrs, instr)             1 { /**/ }
 
 instr: FI(THEN(IF(expr, block), elifs), else)             1 { /**/ }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
-instr: PRINT(expr)                                        1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
+instr: PRINT(expr)                                        1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", 4, "_prints"); }
 instr: expr                                               1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 
