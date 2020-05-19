@@ -24,6 +24,8 @@ static void yytrace(NODEPTR_TYPE p, int eruleno, int cost, int bestcost);
 
 extern FILE *yyout;
 
+static int lbl;
+
 static char *mklbl(int n) {
   static char buf[20];
   sprintf(buf, "%cL%d", n < 0 ? '.' : '_', n);
@@ -37,6 +39,11 @@ static char *mkfunc(char *s) {
   return buf;
 }
 
+static void outstr(char *s) {
+  while (*s) fprintf(yyout, pfCHAR, (unsigned char)*s++);
+  fprintf(yyout, pfCHAR, 0);
+}
+
 %}
 
 %term STMT=';' PRINT='!' ALLOC='#' INDEX='[' READ='?'
@@ -48,18 +55,19 @@ static char *mkfunc(char *s) {
 
 %%
 
-file: PROGRAM(decls, FUNCTION(END(ID, INT), FARGS(NIL, main)))      1 { /**/ }
+file: PROGRAM(decls, FUNCTION(END(ID, INT), FARGS(NIL, main)))      1 { fprintf(yyout, pfIMM pfPOP pfLEAVE pfRET, 0); }
 file: MODULE(decls)                                                 1 { /**/ }
 
-decls: NIL                              1 { /**/ }
 decls: gdecls                           1 { /**/ }
 
-gdecls: DECL(gdecls, decl)              1 { /**/ }
 gdecls: DECL(NIL, decl)                 1 { /**/ }
+gdecls: NIL                             1 { /**/ }
 
 decl: VAR(vardecl)                                        1 { /**/ }
-decl: FUNCTION(END(ID, INT), FARGS(fvars, eqbody))        1 { /**/ }
-decl: FUNCTION(END(ID, INT), FARGS(NIL, eqbody))          1 { /**/ }
+decl: FUNCTION(END(ID, INT), FARGS(fvars, NIL))           1 { /**/ }
+decl: FUNCTION(END(ID, INT), FARGS(fvars, body))          1 { /**/ }
+decl: FUNCTION(END(ID, INT), FARGS(NIL, NIL))             1 { /**/ }
+decl: FUNCTION(END(ID, INT), FARGS(NIL, body))            1 { /**/ }
 decl: NIL                                                 1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { /**/ }
@@ -69,39 +77,35 @@ fvar: ARRAY(ID, INTS(INT, NIL))         1 { /**/ }
 fvars: ARGS(NIL, fvar)                  1 { /**/ }
 fvars: ARGS(fvars, fvar)                1 { /**/ }
 
-vardecl: NUMBER(ID, eqint)              1 { /**/ }
-vardecl: STRING(ID, eqstr)              1 { /**/ }
-vardecl: ARRAY(ID, INTS(INT, eqvec))    1 { /**/ }
+vardecl: NUMBER(ID, NIL)                1 { /**/ }
+vardecl: NUMBER(ID, INT)                1 { /**/ }
+vardecl: STRING(ID, NIL)                1 { /**/ }
+vardecl: STRING(ID, chars)              1 { /**/ }
+vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
+vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
 
 %! vdim qualif const type ftype
-
-eqint: NIL                              1 { /**/ }
-eqint: INT                              1 { /**/ }
-%! eqint: INT                              1 { /**/ }
-
-eqstr: NIL                              1 { /**/ }
-eqstr: chars                            1 { /**/ }
 
 chars: CHARS(NIL, char)                 1 { /**/ }
 chars: CHARS(chars, char)               1 { /**/ }
 
 char: INT                               1 { /**/ }
 char: CHAR                              1 { /**/ }
-char: STR                               1 { /**/ }
-
-eqvec: NIL                              1 { /**/ }
-eqvec: ints                             1 { /**/ }
+char: STR                               1 { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(++lbl));
+                                            outstr(p->value.s);
+                                            fprintf(yyout, pfTEXT pfADDR, mklbl(lbl));
+                                          }
 
 ints: INT                               1 { /**/ }
-%! ints: INT                               1 { /**/ }
 ints: INTS(ints, INT)                   1 { /**/ }
+%! ints: INT                               1 { /**/ }
 %! ints: INTS(ints, INT)                   1 { /**/ }
 
-eqbody: NIL                             1 { /**/ }
-eqbody: body                            1 { /**/ }
+main: START(fvars, minstrs)             1 { /**/ }
+main: START(NIL, minstrs)               1 { /**/ }
 
-main: START(fvars, instrs)              1 { /**/ }
-main: START(NIL, instrs)                1 { /**/ }
+minstrs: NIL                            1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL pfENTER, "_main", pfFUNC, "_main", 0); }
+minstrs: STMT(minstrs, instr)           1 { /**/ }
 
 body: START(fvars, STMT(instrs, ret))   1 { /**/ }
 body: START(NIL, STMT(instrs, ret))     1 { /**/ }
@@ -110,18 +114,18 @@ ret: RETURN(NIL)                        1 { /**/ }
 ret: RETURN(expr)                       1 { /**/ }
 ret: NIL                                1 { /**/ }
 
-loop: ret                               1 { /**/ }
-loop: REPEAT                            1 { /**/ }
-loop: STOP                              1 { /**/ }
-
-block: STMT(instrs, loop)               1 { /**/ }
+block: STMT(instrs, NIL)                1 { /**/ }
+block: STMT(instrs, RETURN(NIL))        1 { /**/ }
+block: STMT(instrs, RETURN(expr))       1 { /**/ }
+block: STMT(instrs, REPEAT)             1 { /**/ }
+block: STMT(instrs, STOP)               1 { /**/ }
 
 instrs: NIL                             1 { /**/ }
 instrs: STMT(instrs, instr)             1 { /**/ }
 
 instr: FI(THEN(IF(expr, block), elifs), else)             1 { /**/ }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
-instr: PRINT(expr)                                        1 { /**/ }
+instr: PRINT(expr)                                        1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
 instr: expr                                               1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 

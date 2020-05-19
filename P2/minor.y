@@ -6,6 +6,8 @@
 #include "tabid.h"
 #include "minor.h"
 
+#define YYDEBUG 1
+
 int yylex(), yyparse(), yyerror(const char*), evaluate(Node*); /* parsers */
 static int isId(char*,Node*,int*), isInt(Node*,char*), isAddSub(Node*,char*);
 static int isCmp(Node*,char*), isUniInt(Node*,char*), isAddr(Node*);
@@ -269,10 +271,10 @@ exprs : expr                        { $$ = binNode(',', $1, nilNode(NIL)); }
 %%
 
 char **yynames =
-#ifdef YYDEBUG
-(char**)yyname;
+#if YYDEBUG
+  (char**) yyname;
 #else
- 0;
+  0;
 #endif
 
 #define tSUB(n,i) tTYPE(n->SUB(i)->info)
