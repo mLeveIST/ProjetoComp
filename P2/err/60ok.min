@@ -1,4 +1,10 @@
 program
-  string s
+  string s;
+  number t
 start
+  s := "best ";
+  t := 69;
+  s!
+  t!
+  "\n"!
 end

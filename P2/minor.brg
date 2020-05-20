@@ -143,11 +143,13 @@ ichars: chars                           1 { /**/ }
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 
-lval: ID                                1 { fprintf(yyout, pfADDR pfLOAD, p->value.s); }
+lval: ID                                1 { fprintf(yyout, pfADDR, p->value.s); }
 lval: INDEX(expr, ID)                   1 { /**/ }
 
+exprval: expr                           1 { fprintf(yyout, pfDUP); }
+
 expr: ichars                            1 { /**/ }
-expr: lval                              1 { /**/ }
+expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { /**/ }
 expr: expr                              1 { /**/ }
 expr: ADD(expr, expr)               isInt { /**/ }
@@ -166,7 +168,7 @@ expr: AND(expr, expr)                   1 { /**/ }
 expr: OR(expr, expr)                    1 { /**/ }
 expr: NOT(expr, expr)                   1 { /**/ }
 expr: UMINUS(expr)                      1 { /**/ }
-expr: ASSOC(expr, lval)             isInt { /**/ }
+expr: ASSOC(exprval, lval)          isInt { fprintf(yyout, pfSTORE); }
 expr: CALL(ID, exprs)               isInt { /**/ }
 
 sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfADDR, 0, lb); }
