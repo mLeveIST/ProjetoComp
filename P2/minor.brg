@@ -131,6 +131,8 @@ instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfC
 instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
 instr: PRINT(vexpr)                               isLeftVec { /**/ } 
 instr: expr                                               1 { /**/ }
+instr: sexpr                                              1 { /**/ }
+instr: vexpr                                              1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 
 elifs: NIL                              1 { /**/ }
@@ -151,7 +153,6 @@ exprval: expr                           1 { fprintf(yyout, pfDUP); }
 expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { /**/ }
-expr: expr                              1 { /**/ }
 expr: ADD(expr, expr)               isInt { /**/ }
 expr: SUB(expr, expr)               isInt { /**/ }
 expr: MULT(expr, expr)                  1 { /**/ }
@@ -173,7 +174,6 @@ expr: CALL(ID, exprs)               isInt { /**/ }
 
 sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfADDR, 0, lb); }
 sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
-sexpr: sexpr                            1 { /**/ }
 sexpr: EQ(sexpr, sexpr)             isStr { /**/ }
 sexpr: NE(sexpr, sexpr)             isStr { /**/ }
 sexpr: GE(sexpr, sexpr)             isStr { /**/ }
@@ -185,7 +185,6 @@ sexpr: CALL(ID, exprs)              isStr { /**/ }
 
 vexpr: lval                             1 { /**/ }
 vexpr: ADDR(lval)                       1 { /**/ }
-vexpr: vexpr                            1 { /**/ }
 vexpr: ADD(expr, vexpr)             isVec { /**/ }
 vexpr: SUB(vexpr, vexpr)            isVec { /**/ }
 vexpr: ASSOC(vexpr, lval)           isVec { /**/ }
