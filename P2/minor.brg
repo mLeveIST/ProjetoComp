@@ -24,7 +24,10 @@ static void yytrace(NODEPTR_TYPE p, int eruleno, int cost, int bestcost);
 
 extern FILE *yyout;
 
+static int strinit;
+
 static int lbl;
+static char *lb;
 
 static char *mklbl(int n)
 {
@@ -41,20 +44,17 @@ static char *mkfunc(char *s)
   return buf;
 }
 
-static void outstr(char *s)
+static int isInt(Node *n) { return tTYPE(n->info) == tINT ? 1 : 1000; }
+static int isStr(Node *n) { return tTYPE(n->info) == tSTR ? 1 : 1000; }
+static int isVec(Node *n) { return tTYPE(n->info) == tVEC ? 1 : 1000; }
+
+static int isLeftInt(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT ? 1 : 1000; }
+static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 1000; }
+static int isLeftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 1000; }
+
+static void litstr(char *s)
 {
   while (*s) fprintf(yyout, pfCHAR, (unsigned char)*s++);
-  fprintf(yyout, pfCHAR, 0);
-}
-
-static void printExpr(Node *p)
-{
-  int type = tTYPE(p->info);
-
-  if (type == tINT)
-    fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi");
-  else if (type == tSTR)
-    fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints");
 }
 
 %}
@@ -89,19 +89,17 @@ fvars: ARGS(fvars, fvar)                1 { /**/ }
 
 vardecl: NUMBER(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, 4); }
 vardecl: NUMBER(ID, INT)                1 { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.i); }
-vardecl: STRING(ID, chars)              1 { /**/ }
+vardecl: STRING(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, pfWORD); }
+vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR pfDATA pfALIGN pfLABEL pfID, 0, LEFT_CHILD(p)->value.s, lb); }
 vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
 vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
 
-chars: NIL                              1 { /**/ }
+chars: NIL                              1 { lb = mklbl(++lbl); fprintf(yyout, pfRODATA pfALIGN pfLABEL, lb); }
 chars: CHARS(chars, char)               1 { /**/ }
 
-char: INT                               1 { }
-char: CHAR                              1 { /**/ }
-char: STR                               1 { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(++lbl));
-                                            outstr(p->value.s);
-                                            fprintf(yyout, pfTEXT pfADDR, mklbl(lbl));
-                                          }
+char: INT                               1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
+char: CHAR                              1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
+char: STR                               1 { litstr(p->value.s); }
 
 ints: INT                               1 { /**/ }
 ints: INTS(ints, INT)                   1 { /**/ }
@@ -129,7 +127,9 @@ instrs: STMT(instrs, instr)             1 { /**/ }
 
 instr: FI(THEN(IF(expr, block), elifs), else)             1 { /**/ }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
-instr: PRINT(expr)                                        1 { printExpr(LEFT_CHILD(p)); }
+instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
+instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
+instr: PRINT(vexpr)                               isLeftVec { /**/ } 
 instr: expr                                               1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 
@@ -139,35 +139,60 @@ elifs: ELIF(elifs, IF(expr, block))     1 { /**/ }
 else: NIL                               1 { /**/ }
 else: block                             1 { /**/ }
 
+ichars: chars                           1 { /**/ }  
+ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, LEFT_CHILD(p)->value.i); }
+ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, LEFT_CHILD(p)->value.i); }
+
 lval: ID                                1 { fprintf(yyout, pfADDR pfLOAD, p->value.s); }
 lval: INDEX(expr, ID)                   1 { /**/ }
 
-expr: chars                             1 { /**/ }
+expr: ichars                            1 { /**/ }
 expr: lval                              1 { /**/ }
 expr: READ                              1 { /**/ }
-expr: ADDR(lval)                        1 { /**/ }
 expr: expr                              1 { /**/ }
-expr: ADD(expr, expr)                   1 { /**/ }
-expr: SUB(expr, expr)                   1 { /**/ }
+expr: ADD(expr, expr)               isInt { /**/ }
+expr: SUB(expr, expr)               isInt { /**/ }
 expr: MULT(expr, expr)                  1 { /**/ }
 expr: DIV(expr, expr)                   1 { /**/ }
 expr: MOD(expr, expr)                   1 { /**/ }
 expr: EXP(expr, expr)                   1 { /**/ }
-expr: EQ(expr, expr)                    1 { /**/ }
-expr: NE(expr, expr)                    1 { /**/ }
-expr: GE(expr, expr)                    1 { /**/ }
-expr: LE(expr, expr)                    1 { /**/ }
-expr: LESS(expr, expr)                  1 { /**/ }
-expr: GRT(expr, expr)                   1 { /**/ }
+expr: EQ(expr, expr)                isInt { /**/ }
+expr: NE(expr, expr)                isInt { /**/ }
+expr: GE(expr, expr)                isInt { /**/ }
+expr: LE(expr, expr)                isInt { /**/ }
+expr: LESS(expr, expr)              isInt { /**/ }
+expr: GRT(expr, expr)               isInt { /**/ }
 expr: AND(expr, expr)                   1 { /**/ }
 expr: OR(expr, expr)                    1 { /**/ }
 expr: NOT(expr, expr)                   1 { /**/ }
 expr: UMINUS(expr)                      1 { /**/ }
-expr: ASSOC(expr, lval)                 1 { /**/ }
-expr: CALL(ID, exprs)                   1 { /**/ }
+expr: ASSOC(expr, lval)             isInt { /**/ }
+expr: CALL(ID, exprs)               isInt { /**/ }
+
+sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfADDR, 0, lb); }
+sexpr: lval                             1 { /**/ }
+sexpr: sexpr                            1 { /**/ }
+sexpr: EQ(sexpr, sexpr)             isStr { /**/ }
+sexpr: NE(sexpr, sexpr)             isStr { /**/ }
+sexpr: GE(sexpr, sexpr)             isStr { /**/ }
+sexpr: LE(sexpr, sexpr)             isStr { /**/ }
+sexpr: LESS(sexpr, sexpr)           isStr { /**/ }
+sexpr: GRT(sexpr, sexpr)            isStr { /**/ }
+sexpr: ASSOC(sexpr, lval)           isStr { /**/ }
+sexpr: CALL(ID, exprs)              isStr { /**/ }
+
+vexpr: lval                             1 { /**/ }
+vexpr: ADDR(lval)                       1 { /**/ }
+vexpr: vexpr                            1 { /**/ }
+vexpr: ADD(expr, vexpr)             isVec { /**/ }
+vexpr: SUB(vexpr, vexpr)            isVec { /**/ }
+vexpr: ASSOC(vexpr, lval)           isVec { /**/ }
+vexpr: CALL(ID, exprs)              isVec { /**/ }
 
 exprs: NIL                              1 { /**/ }
 exprs: PARAMS(expr, exprs)              1 { /**/ }
+exprs: PARAMS(sexpr, exprs)             1 { /**/ }
+exprs: PARAMS(vexpr, exprs)             1 { /**/ }
 
 %%
 

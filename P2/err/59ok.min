@@ -1,0 +1,8 @@
+program
+  string s := "olá!\n";
+  string t := 97 'd' "eus..\n"
+start
+  s!
+  "hey" "\n" !
+  t!
+end

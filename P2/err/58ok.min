@@ -2,4 +2,5 @@ program
   number var := 4
 start
   var!
+  5!
 end
