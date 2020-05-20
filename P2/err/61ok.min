@@ -1,0 +1,43 @@
+program
+  number x := 1;
+  number y := 2;
+  number w := 3;
+  number z := 4
+start
+  -w !          $$ -3
+  "\n"!
+  x + y !       $$ 3
+  "\n"!
+  x + y + z !   $$ 7
+  "\n"!
+  z - x !       $$ 3
+  "\n"!
+  (z - x) = w ! $$ true
+  "\n"!
+  x - y !       $$ -1
+  "\n"!
+  z / y !       $$ 2
+  "\n"!
+  z / w !       $$ 1
+  "\n"!
+  z % y !       $$ 0
+  "\n"!
+  y % w !       $$ 2
+  "\n"!
+  y > w !       $$ false
+  "\n"!
+  w >= y !      $$ true
+  "\n"!
+  y < w !       $$ true
+  "\n"!
+  z <= w !      $$ false
+  "\n"!
+  z ~= x !      $$ true
+  "\n"!
+  z | x !       $$ true
+  "\n"!
+  z & 0 !       $$ false
+  "\n"!
+  ~y !          $$ 0
+  "\n"!
+end

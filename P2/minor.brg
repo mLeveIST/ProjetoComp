@@ -125,7 +125,7 @@ block: STMT(instrs, STOP)               1 { /**/ }
 instrs: NIL                             1 { /**/ }
 instrs: STMT(instrs, instr)             1 { /**/ }
 
-instr: FI(THEN(IF(expr, block), elifs), else)             1 { /**/ }
+instr: FI(THEN(IF(expr, block), elifs), else)             1 {  }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
 instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
 instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
@@ -153,24 +153,27 @@ exprval: expr                           1 { fprintf(yyout, pfDUP); }
 expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { /**/ }
-expr: ADD(expr, expr)               isInt { /**/ }
-expr: SUB(expr, expr)               isInt { /**/ }
-expr: MULT(expr, expr)                  1 { /**/ }
-expr: DIV(expr, expr)                   1 { /**/ }
-expr: MOD(expr, expr)                   1 { /**/ }
+expr: ADD(expr, expr)               isInt { fprintf(yyout, pfADD); }
+expr: SUB(expr, expr)               isInt { fprintf(yyout, pfSUB); }
+expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
+expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
+expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
 expr: EXP(expr, expr)                   1 { /**/ }
-expr: EQ(expr, expr)                isInt { /**/ }
-expr: NE(expr, expr)                isInt { /**/ }
-expr: GE(expr, expr)                isInt { /**/ }
-expr: LE(expr, expr)                isInt { /**/ }
-expr: LESS(expr, expr)              isInt { /**/ }
-expr: GRT(expr, expr)               isInt { /**/ }
-expr: AND(expr, expr)                   1 { /**/ }
-expr: OR(expr, expr)                    1 { /**/ }
-expr: NOT(expr, expr)                   1 { /**/ }
-expr: UMINUS(expr)                      1 { /**/ }
+expr: EQ(expr, expr)                isInt { fprintf(yyout, pfEQ); }
+expr: NE(expr, expr)                isInt { fprintf(yyout, pfNE); }
+expr: GE(expr, expr)                isInt { fprintf(yyout, pfGE); }
+expr: LE(expr, expr)                isInt { fprintf(yyout, pfLE); }
+expr: LESS(expr, expr)              isInt { fprintf(yyout, pfLT); }
+expr: GRT(expr, expr)               isInt { fprintf(yyout, pfGT); }
+expr: AND(and, expr)                    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
+expr: OR(or, expr)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
+expr: NOT(expr)                         1 { fprintf(yyout, pfIMM pfEQ, 0); }
+expr: UMINUS(expr)                      1 { fprintf(yyout, pfNEG); }
 expr: ASSOC(exprval, lval)          isInt { fprintf(yyout, pfSTORE); }
 expr: CALL(ID, exprs)               isInt { /**/ }
+
+and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
+or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
 sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfADDR, 0, lb); }
 sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
