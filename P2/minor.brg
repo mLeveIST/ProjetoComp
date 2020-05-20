@@ -180,7 +180,7 @@ sexpr: GE(sexpr, sexpr)             isStr { /**/ }
 sexpr: LE(sexpr, sexpr)             isStr { /**/ }
 sexpr: LESS(sexpr, sexpr)           isStr { /**/ }
 sexpr: GRT(sexpr, sexpr)            isStr { /**/ }
-sexpr: ASSOC(sexpr, lval)           isStr { /**/ }
+sexpr: ASSOC(sexpr, lval)           isStr { fprintf(yyout, pfSTORE); }
 sexpr: CALL(ID, exprs)              isStr { /**/ }
 
 vexpr: lval                             1 { /**/ }
