@@ -172,7 +172,7 @@ expr: ASSOC(exprval, lval)          isInt { fprintf(yyout, pfSTORE); }
 expr: CALL(ID, exprs)               isInt { /**/ }
 
 sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfADDR, 0, lb); }
-sexpr: lval                             1 { /**/ }
+sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
 sexpr: sexpr                            1 { /**/ }
 sexpr: EQ(sexpr, sexpr)             isStr { /**/ }
 sexpr: NE(sexpr, sexpr)             isStr { /**/ }
