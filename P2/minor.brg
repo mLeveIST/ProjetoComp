@@ -26,22 +26,35 @@ extern FILE *yyout;
 
 static int lbl;
 
-static char *mklbl(int n) {
+static char *mklbl(int n)
+{
   static char buf[20];
   sprintf(buf, "%cL%d", n < 0 ? '.' : '_', n);
   return strcpy(malloc(strlen(buf) + 1), buf);
 }
 
-static char *mkfunc(char *s) {
+static char *mkfunc(char *s)
+{
   static char buf[80];
   strcpy(buf, "_");
   strcat(buf, s);
   return buf;
 }
 
-static void outstr(char *s) {
+static void outstr(char *s)
+{
   while (*s) fprintf(yyout, pfCHAR, (unsigned char)*s++);
   fprintf(yyout, pfCHAR, 0);
+}
+
+static void printExpr(Node *p)
+{
+  int type = tTYPE(p->info);
+
+  if (type == tINT)
+    fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi");
+  else if (type == tSTR)
+    fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints");
 }
 
 %}
@@ -116,7 +129,7 @@ instrs: STMT(instrs, instr)             1 { /**/ }
 
 instr: FI(THEN(IF(expr, block), elifs), else)             1 { /**/ }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
-instr: PRINT(expr)                                        1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", 4, "_prints"); }
+instr: PRINT(expr)                                        1 { printExpr(p); }
 instr: expr                                               1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 
@@ -126,7 +139,7 @@ elifs: ELIF(elifs, IF(expr, block))     1 { /**/ }
 else: NIL                               1 { /**/ }
 else: block                             1 { /**/ }
 
-lval: ID                                1 { /**/ }
+lval: ID                                1 { fprintf(yyout, pfADDR pfLOAD, p->value.s); }
 lval: INDEX(expr, ID)                   1 { /**/ }
 
 expr: chars                             1 { /**/ }
