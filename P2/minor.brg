@@ -129,7 +129,7 @@ instrs: STMT(instrs, instr)             1 { /**/ }
 
 instr: FI(THEN(IF(expr, block), elifs), else)             1 { /**/ }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
-instr: PRINT(expr)                                        1 { printExpr(p); }
+instr: PRINT(expr)                                        1 { printExpr(LEFT_CHILD(p)); }
 instr: expr                                               1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 
