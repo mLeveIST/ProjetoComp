@@ -1,6 +1,6 @@
 program
   string s := "olá!\n";
-  string t := 97 'd' "eus..\n"
+  string t := 97 'd' "eus...\n"
 start
   s!
   "hey" "\n" !

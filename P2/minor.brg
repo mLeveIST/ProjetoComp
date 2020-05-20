@@ -140,8 +140,8 @@ else: NIL                               1 { /**/ }
 else: block                             1 { /**/ }
 
 ichars: chars                           1 { /**/ }  
-ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, LEFT_CHILD(p)->value.i); }
-ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, LEFT_CHILD(p)->value.i); }
+ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
+ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 
 lval: ID                                1 { fprintf(yyout, pfADDR pfLOAD, p->value.s); }
 lval: INDEX(expr, ID)                   1 { /**/ }

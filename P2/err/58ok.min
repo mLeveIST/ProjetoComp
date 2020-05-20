@@ -3,4 +3,5 @@ program
 start
   var!
   5!
+  'a'!
 end
