@@ -2,5 +2,5 @@ program
   number var
 start
   var := ?;
-  var!
+  "You wrote: "! var! "\n"!
 end

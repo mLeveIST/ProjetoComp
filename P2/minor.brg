@@ -146,7 +146,7 @@ instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfS
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
 elifs: NIL                              1 { /**/ }
-elifs: ELIF(elifs, ifb)                 1 { /**/ }
+elifs: ELIF(elifs, ifbe)                1 { /**/ }
 
 ichars: chars                           1 { /**/ }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }

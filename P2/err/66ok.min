@@ -1,0 +1,19 @@
+program
+  number x := 1;
+  number y := 2;
+  number z := 3
+start
+  if x <= y then
+    if x <= z then
+      x! " : is the right answer."!
+    else
+      z! " : is the wrong answer."!
+    fi
+  else
+    y! " : is the wrong answer."!
+  fi
+
+  if 1 then
+    "\n"!
+  fi
+end
