@@ -1,16 +1,20 @@
 program
-  number x := 1;
-  number y := 2;
-  number z := 3
+  number x;
+  number y;
+  number z
 start
+  "write 3 numbers:\n"!
+  x := ?;
+  y := ?;
+  z := ?;
   if x <= y then
     if x <= z then
-      x! " : is the right answer."!
+      x! " : is the smallest."!
     else
-      z! " : is the wrong answer."!
+      x! " : is middle number."!
     fi
   else
-    y! " : is the wrong answer."!
+    x! " : is larger than "! y! "."!
   fi
 
   if 1 then

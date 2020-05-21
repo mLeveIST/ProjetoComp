@@ -92,11 +92,11 @@ fvars: ARGS(fvars, fvar)                1 { /**/ }
 vardecl: NUMBER(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, 4); }
 vardecl: NUMBER(ID, INT)                1 { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.i); }
 vardecl: STRING(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, pfWORD); }
-vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR pfDATA pfALIGN pfLABEL pfID, 0, LEFT_CHILD(p)->value.s, lb); }
+vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR pfDATA pfALIGN pfLABEL pfID, 0, LEFT_CHILD(p)->value.s, mklbl(lbl)); }
 vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
 vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
 
-chars: NIL                              1 { lb = mklbl(++lbl); fprintf(yyout, pfRODATA pfALIGN pfLABEL, lb); }
+chars: NIL                              1 { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(++lbl)); }
 chars: CHARS(chars, char)               1 { /**/ }
 
 char: INT                               1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
@@ -146,7 +146,8 @@ instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfS
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
 elifs: NIL                              1 { /**/ }
-elifs: ELIF(elifs, ifbe)                1 { /**/ }
+elifs: ELIF(NIL, IF(ifexpr, block))     1 { lb = mklbl(p->place = ++lbl); fprintf(yyout, pfJMP pfLABEL, lb, mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
+elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, lb, mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 
 ichars: chars                           1 { /**/ }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
