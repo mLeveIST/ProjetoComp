@@ -140,8 +140,8 @@ ifexpr: expr                            1 { fprintf(yyout, pfJZ, mklbl(p->place 
 ifb: IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, mkelbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
 
-instr: FI(THEN(ifb, elifs), NIL)                          1 { /**/ }
-instr: FI(THEN(ifbe, elifs), block)                       1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
+instr: FI(THEN(ifb, elifsi), NIL)                         1 { /**/ }
+instr: FI(THEN(ifbe, elifsi), block)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
 instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
 instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
@@ -153,8 +153,10 @@ instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfS
 
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
+elifsi: elifs                           1 { --elbl; }
+
 elifs: NIL                              1 { /**/ }
-elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl(elb[elbl--]), mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
+elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl(elb[elbl]), mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 
 ichars: chars                           1 { /**/ }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
