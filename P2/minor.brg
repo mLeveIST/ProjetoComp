@@ -106,10 +106,10 @@ char: STR                               1 { litstr(p->value.s); }
 ints: INT                               1 { /**/ }
 ints: INTS(ints, INT)                   1 { /**/ }
 
-main: START(fvars, minstrs)             1 { /**/ }
+main: START(mvars, instrs)              1 { /**/ }
 
-minstrs: NIL                            1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL pfENTER, "_main", pfFUNC, "_main", 0); }
-minstrs: STMT(minstrs, instr)           1 { /**/ }
+mvars: NIL                              1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL pfENTER, "_main", pfFUNC, "_main", 0); }
+mvars: ARGS(fvars, fvar)                1 { /**/ }
 
 body: NIL                               1 { /**/ }
 body: START(fvars, STMT(instrs, ret))   1 { /**/ }
@@ -141,7 +141,9 @@ instr: PRINT(vexpr)                               isLeftVec { /**/ }
 instr: expr                                               1 { fprintf(yyout, pfTRASH, 4); }
 instr: sexpr                                              1 { /**/ }
 instr: vexpr                                              1 { /**/ }
-instr: ALLOC(expr, lval)                                  1 { /**/ }
+instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfSTORE); }
+
+alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
 elifs: NIL                              1 { /**/ }
 elifs: ELIF(elifs, ifb)                 1 { /**/ }
@@ -151,13 +153,13 @@ ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)
 ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 
 lval: ID                                1 { fprintf(yyout, pfADDR, p->value.s); }
-lval: INDEX(expr, ID)                   1 { /**/ }
+lval: INDEX(expr, ID)                   1 { fprintf(yyout, pfIMM pfMUL pfADDR pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
 
 exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
 expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
-expr: READ                              1 { /**/ }
+expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
 expr: ADD(expr, expr)               isInt { fprintf(yyout, pfADD); }
 expr: SUB(expr, expr)               isInt { fprintf(yyout, pfSUB); }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
