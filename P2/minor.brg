@@ -29,6 +29,8 @@ static int strinit;
 static int lbl;
 static char *lb;
 
+static int *iflbls;
+
 static char *mklbl(int n)
 {
   static char buf[20];
@@ -125,18 +127,22 @@ block: STMT(instrs, STOP)               1 { /**/ }
 instrs: NIL                             1 { /**/ }
 instrs: STMT(instrs, instr)             1 { /**/ }
 
-instr: FI(THEN(IF(expr, block), elifs), else)             1 {  }
+ifexpr: expr                            1 { fprintf(yyout, pfJZ, mklbl(p->place = ++lbl)); }
+
+ifb: IF(ifexpr, block)                1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
+
+instr: FI(THEN(ifb, elifs), else)                         1 { /**/ }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
 instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
 instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
 instr: PRINT(vexpr)                               isLeftVec { /**/ } 
-instr: expr                                               1 { /**/ }
+instr: expr                                               1 { fprintf(yyout, pfTRASH, 4); }
 instr: sexpr                                              1 { /**/ }
 instr: vexpr                                              1 { /**/ }
 instr: ALLOC(expr, lval)                                  1 { /**/ }
 
 elifs: NIL                              1 { /**/ }
-elifs: ELIF(elifs, IF(expr, block))     1 { /**/ }
+elifs: ELIF(elifs, ifb)                 1 { /**/ }
 
 else: NIL                               1 { /**/ }
 else: block                             1 { /**/ }

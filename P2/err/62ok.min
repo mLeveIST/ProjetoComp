@@ -1,0 +1,8 @@
+program
+  number x := 1;
+  number y := 2
+start
+  if x + y then
+    y!
+  fi
+end
