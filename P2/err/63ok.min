@@ -1,0 +1,14 @@
+program
+  number x := 1;
+  number y := 2
+start
+  if x >= y then
+    y! " : is the wrong answer!"!
+  else
+    x! " : is the right answer."!
+  fi
+
+  if 1 then
+    "\n"!
+  fi
+end

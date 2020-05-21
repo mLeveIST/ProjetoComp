@@ -3,6 +3,10 @@ program
   number y := 2
 start
   if x + y then
-    y!
+    y! "\n"!
+  fi
+
+  if x >= y then
+    x! "\n"!
   fi
 end
