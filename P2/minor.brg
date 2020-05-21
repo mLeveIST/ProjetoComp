@@ -133,7 +133,7 @@ ifb: IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_C
 ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, mklbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
 
 instr: FI(THEN(ifb, elifs), NIL)                          1 { /**/ }
-instr: FI(THEN(ifbe, elifs), block)                       1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
+instr: FI(THEN(ifbe, elifs), block)                       1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
 instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
 instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
 instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
