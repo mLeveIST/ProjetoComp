@@ -1,0 +1,59 @@
+program
+  number x
+start
+  "write a number:\n"!
+  x := ?;
+
+  if x > 0 & x <= 6 then
+    "Enter if 1...\n"!
+    if x = 1 | x = 2 then
+      "Enter if 2...\n"!
+      if x = 2 then
+        "Enter if 3...\n"!
+        x! "\n"!
+      else
+        "Enter if 3...\n"!
+        x! "\n"!
+      fi
+      "Leaving if 3.\n"!
+    elif x = 3 then
+      "Enter if 2...\n"!
+      x! "\n"!
+    elif x >= 5 & x <= 7 then
+      "Enter if 2...\n"!
+      if x = 5 then
+        "Enter if 3...\n"!
+        x! "\n"!
+      elif x = 6 then
+        "Enter if 3...\n"!
+        x! "\n"!
+      else
+        "Enter if 3...\n"!
+        x! "\n"!
+      fi
+      "Leaving if 3.\n"!
+    elif x = 4 then
+      "Enter if 2...\n"!
+      x! "\n"!
+    else
+      "Enter if 2...\n"!
+      x! " : error : reached impossible else!\n"!
+    fi
+    "Leaving if 2.\n"!
+  elif x >= 7 & x < 8 then
+    "Enter if 1...\n"!
+    x! "\n"!
+  elif x >= 8 then
+    "Enter if 1...\n"!
+    x! "\n"!
+  else
+    "Enter if 1...\n"!
+    if x <= 0 then
+      "Enter if 2...\n"!
+      "Only numbers > 0."!
+    fi
+    "Leaving if 2.\n"!
+    x! " : error : reached impossible else\n"!
+  fi
+  "Leaving if 1.\n"!
+end
