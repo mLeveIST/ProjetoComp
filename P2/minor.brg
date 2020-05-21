@@ -131,7 +131,7 @@ instrs: STMT(instrs, instr)             1 { /**/ }
 ifexpr: expr                            1 { fprintf(yyout, pfJZ, mklbl(p->place = ++lbl)); }
 
 ifb: IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
-ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, mklbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
+ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, elb = mklbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
 
 instr: FI(THEN(ifb, elifs), NIL)                          1 { /**/ }
 instr: FI(THEN(ifbe, elifs), block)                       1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
@@ -147,7 +147,6 @@ instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfS
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
 elifs: NIL                              1 { /**/ }
-elifs: ELIF(NIL, IF(ifexpr, block))     1 { elb = mklbl(p->place = ++lbl); fprintf(yyout, pfJMP pfLABEL, elb, mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, elb, mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 
 ichars: chars                           1 { /**/ }  
