@@ -30,7 +30,7 @@ static int lbl;
 static char *lb;
 
 static int elb[20]; /* stack for labels of nested conditions */
-static int elbl; /* top of useful elb stack */
+static int elbl = -1; /* top of useful elb stack */
 
 static int *iflbls;
 
@@ -43,7 +43,7 @@ static char *mklbl(int n)
 
 static char *mkelbl(int n)
 {
-  return mklbl(elb[elbl++] = n);
+  return mklbl(elb[++elbl] = n);
 }
 
 static char *mkfunc(char *s)
