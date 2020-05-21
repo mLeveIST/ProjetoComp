@@ -4,7 +4,7 @@ start
   "write a number:\n"!
   x := ?;
 
-  if x > 0 & x <= 6 then
+  if x > 0 & x <= 7 then
     "Enter if 1...\n"!
     if x = 1 | x = 2 then
       "Enter if 2...\n"!
@@ -40,10 +40,10 @@ start
       x! " : error : reached impossible else!\n"!
     fi
     "Leaving if 2.\n"!
-  elif x >= 7 & x < 8 then
+  elif x > 7 & x < 9 then
     "Enter if 1...\n"!
     x! "\n"!
-  elif x >= 8 then
+  elif x >= 9 then
     "Enter if 1...\n"!
     x! "\n"!
   else

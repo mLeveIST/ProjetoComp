@@ -28,7 +28,9 @@ static int strinit;
 
 static int lbl;
 static char *lb;
-static char *elb;
+
+static int elb[20]; /* stack for labels of nested conditions */
+static int elbl; /* top of useful elb stack */
 
 static int *iflbls;
 
@@ -37,6 +39,11 @@ static char *mklbl(int n)
   static char buf[20];
   sprintf(buf, "%cL%d", n < 0 ? '.' : '_', n);
   return strcpy(malloc(strlen(buf) + 1), buf);
+}
+
+static char *mkelbl(int n)
+{
+  return mklbl(elb[elbl++] = n);
 }
 
 static char *mkfunc(char *s)
@@ -131,7 +138,7 @@ instrs: STMT(instrs, instr)             1 { /**/ }
 ifexpr: expr                            1 { fprintf(yyout, pfJZ, mklbl(p->place = ++lbl)); }
 
 ifb: IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
-ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, elb = mklbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
+ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, mkelbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
 
 instr: FI(THEN(ifb, elifs), NIL)                          1 { /**/ }
 instr: FI(THEN(ifbe, elifs), block)                       1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
@@ -147,7 +154,7 @@ instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfS
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
 elifs: NIL                              1 { /**/ }
-elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, elb, mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
+elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl(elb[elbl--]), mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 
 ichars: chars                           1 { /**/ }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
