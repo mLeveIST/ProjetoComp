@@ -7,7 +7,7 @@ AS=nasm -felf32 # assembler command
 
 all:: $(RUNTIME)
 
-$(RUNTIME): dbl.o linux.o lib.o sys.o expr.o
+$(RUNTIME): expr.o dbl.o linux.o lib.o sys.o
 	ar crl $@ $^
 .asm.o:
 	$(AS) $< -o $@
