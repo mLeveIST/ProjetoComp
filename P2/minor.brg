@@ -123,14 +123,21 @@ static void pubvar(int type, char *name)
 static void numvar(int type, Node *var)
 {
   if (type & tCNST)
-  {
     fprintf(yyout, pfRODATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(var)->value.s, RIGHT_CHILD(var)->value.i);
-  }
+  else if (RIGHT_CHILD(var)->attrib == NIL)
+    fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(var)->value.s, 4);
+  else if (RIGHT_CHILD(var)->attrib == INT)
+    fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(var)->value.s, RIGHT_CHILD(var)->value.i);
 }
 
 static void strvar(int type, Node *var)
 {
-  
+  if (type & tCNST)
+    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfID, LEFT_CHILD(var)->value.s, mklbl(RIGHT_CHILD(var)->place));
+  else if (RIGHT_CHILD(var)->attrib == NIL)
+    fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(var)->value.s, pfWORD);
+  else if (RIGHT_CHILD(var)->attrib != NIL)
+    fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, LEFT_CHILD(var)->value.s, mklbl(RIGHT_CHILD(var)->place));
 }
 
 static void arrvar(int type, Node *var)
@@ -197,12 +204,14 @@ fvars: ARGS(fvars, fvar)                1 { /**/ }
 vardecl: NUMBER(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, 4); }
 vardecl: NUMBER(ID, INT)                1 { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.i); }
 vardecl: STRING(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, pfWORD); }
-vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR pfDATA pfALIGN pfLABEL pfID, 0, LEFT_CHILD(p)->value.s, lb); }
+vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR, 0); }
 vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
 vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
+vardecl: ARRAY(ID, INTS(NIL, NIL))      1 { /**/ }
+vardecl: ARRAY(ID, INTS(NIL, ints))     1 { /**/ }
 
-chars: NIL                              1 { lb = mklbl(++lbl); fprintf(yyout, pfRODATA pfALIGN pfLABEL, lb); }
-chars: CHARS(chars, char)               1 { /**/ }
+chars: NIL                              1 { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
+chars: CHARS(chars, char)               1 { p->place = LEFT_CHILD(p)->place; }
 
 char: INT                               1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
 char: CHAR                              1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
@@ -216,7 +225,7 @@ main: START(mvarsb, instrs)             1 { /**/ }
 mvarsb: mvars                           1 { fprintf(yyout, pfENTER, lcvarcnt * 4); }
 
 mvars: NIL                              1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL, "_main", pfFUNC, "_main"); }
-mvars: ARGS(mvars, fvar)               1 { lcvarcnt++; }
+mvars: ARGS(mvars, fvar)                1 { lcvarcnt++; }
 
 body: NIL                               1 { /**/ }
 body: START(fvars, STMT(instrs, ret))   1 { /**/ }

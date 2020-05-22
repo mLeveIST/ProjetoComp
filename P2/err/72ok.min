@@ -1,0 +1,9 @@
+program
+    const number x := 1;
+    forward number y;
+    public number z := 2
+start
+    y := 2;
+    z := 3;
+    y! " "! z! "\n"!
+end

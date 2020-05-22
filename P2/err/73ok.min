@@ -1,0 +1,8 @@
+program
+    const string s := "as" 72;
+    forward string t;
+    public string u := 'a' "sa" 72
+start
+    u := "a";
+    s! " "! u! "\n"!
+end
