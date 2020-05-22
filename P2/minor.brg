@@ -341,7 +341,7 @@ expr: SUB(expr, expr)               isInt { fprintf(yyout, pfSUB); }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
-expr: EXP(expr, expr)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_power", 8, "_power"); }
+expr: EXP(expr, expr)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "power", 8, "power"); }
 expr: EQ(expr, expr)                isInt { fprintf(yyout, pfEQ); }
 expr: NE(expr, expr)                isInt { fprintf(yyout, pfNE); }
 expr: GE(expr, expr)                isInt { fprintf(yyout, pfGE); }
@@ -360,12 +360,12 @@ or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, 
 
 sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, mklbl(p->place)); }
 sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
-sexpr: EQ(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: NE(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: GE(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: LE(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: LESS(sexpr, sexpr)           isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: GRT(sexpr, sexpr)            isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+sexpr: EQ(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "strcompr", 8, 0, "strcompr"); }
+sexpr: NE(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "strcompr", 8, 0, "strcompr"); }
+sexpr: GE(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "strcompr", 8, 0, "strcompr"); }
+sexpr: LE(sexpr, sexpr)             isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "strcompr", 8, 0, "strcompr"); }
+sexpr: LESS(sexpr, sexpr)           isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "strcompr", 8, 0, "strcompr"); }
+sexpr: GRT(sexpr, sexpr)            isStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "strcompr", 8, 0, "strcompr"); }
 sexpr: ASSOC(sexpr, lval)           isStr { fprintf(yyout, pfSTORE); }
 sexpr: CALL(ID, exprs)              isStr { /**/ }
 

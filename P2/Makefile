@@ -3,7 +3,7 @@ minor: minor.y minor.l
 	byacc -dv minor.y
 	flex -dl minor.l
 	pburg -T minor.brg
-	gcc lex.yy.c y.tab.c yyselect.c -Ilib lib/node.o lib/tabid.o lib/main.o -o minor
+	gcc -w lex.yy.c y.tab.c yyselect.c -Ilib lib/node.o lib/tabid.o lib/main.o -o minor
 	make -C run
 	-cp run/libminor.a libminor.a
 
