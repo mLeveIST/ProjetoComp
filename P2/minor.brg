@@ -216,7 +216,7 @@ main: START(mvarsb, instrs)             1 { /**/ }
 mvarsb: mvars                           1 { fprintf(yyout, pfENTER, lcvarcnt * 4); }
 
 mvars: NIL                              1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL, "_main", pfFUNC, "_main"); }
-mvars: ARGS(fvars, fvar)                1 { lcvarcnt++; }
+mvars: ARGS(mvars, fvar)               1 { lcvarcnt++; }
 
 body: NIL                               1 { /**/ }
 body: START(fvars, STMT(instrs, ret))   1 { /**/ }
@@ -250,6 +250,7 @@ uexpr : instr                            1 { fprintf(yyout, pfLABEL, mklbl(flb[f
 %! /* If elif else conditions code selection and generation */
 
 instr : FI(THEN(ifb, NIL), NIL)          1 { /**/ }
+instr : FI(THEN(ifbe, elifsi), NIL)      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
 instr : FI(THEN(ifbe, elifsi), block)    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
 
 ifb : IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
