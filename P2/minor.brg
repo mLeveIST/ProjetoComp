@@ -29,21 +29,31 @@ static int strinit;
 static int lbl;
 static char *lb;
 
-static int elb[20]; /* stack for labels of nested conditions */
-static int elbl = -1; /* top of useful elb stack */
+/* Auxiliary stacks that store label numbers for JMP/LABEL pairs
+ * in cases where the label to match cannot be accessed directly
+ * or by accessing child nodes.
+ *
+ * Stacks are used instead of single integers to acomudate cases
+ * of nested blocks that use the same code segments.
+ */
 
-static int *iflbls;
+static int elb[20]; /* Stack for elif/else jump out labels */
+static int elbl = -1; /* Top of useful elb stack */
+
+static int flb[20]; /* Stack for for loop condition labels */
+static int flbl = -1; /* Top of useful flb stack */
+
+static int rlb[60]; /* Stack for for loop repeat labels */
+static int rlbl = -1; /* Top of useful rlb stack */
+
+static int slb[60]; /* Stack for for loop stop labels */
+static int slbl = -1; /* Top of useful slb stack */
 
 static char *mklbl(int n)
 {
   static char buf[20];
   sprintf(buf, "%cL%d", n < 0 ? '.' : '_', n);
   return strcpy(malloc(strlen(buf) + 1), buf);
-}
-
-static char *mkelbl(int n)
-{
-  return mklbl(elb[++elbl] = n);
 }
 
 static char *mkfunc(char *s)
@@ -53,6 +63,29 @@ static char *mkfunc(char *s)
   strcat(buf, s);
   return buf;
 }
+
+static void printrlb()
+{
+  if (rlbl == -1)
+    return;
+
+  while (rlbl != -1 && rlb[rlbl--])
+    fprintf(yyout, pfLABEL, mklbl(rlb[rlbl + 1]));
+}
+
+static void printslb()
+{
+  if (slbl == -1)
+    return;
+
+  while (slbl != -1 && slb[slbl--])
+    fprintf(yyout, pfLABEL, mklbl(slb[slbl + 1]));
+}
+
+static char *mkelbl(int n) { return mklbl(elb[++elbl] = n); }
+static char *mkflbl(int n) { return mklbl(flb[++flbl] = n); }
+static char *mkrlbl(int n) { return mklbl(rlb[++rlbl] = n); }
+static char *mkslbl(int n) { return mklbl(slb[++slbl] = n); }
 
 static int isInt(Node *n) { return tTYPE(n->info) == tINT ? 1 : 1000; }
 static int isStr(Node *n) { return tTYPE(n->info) == tSTR ? 1 : 1000; }
@@ -126,37 +159,54 @@ ret: NIL                                1 { /**/ }
 ret: RETURN(NIL)                        1 { /**/ }
 ret: RETURN(expr)                       1 { /**/ }
 
-block: STMT(instrs, NIL)                1 { /**/ }
+block: STMT(instrs, NIL)                1 {  }
 block: STMT(instrs, RETURN(NIL))        1 { /**/ }
 block: STMT(instrs, RETURN(expr))       1 { /**/ }
-block: STMT(instrs, REPEAT)             1 { /**/ }
-block: STMT(instrs, STOP)               1 { /**/ }
+block: STMT(instrs, REPEAT)             1 { fprintf(yyout, pfJMP, mkrlbl(p->place = ++lbl)); }
+block: STMT(instrs, STOP)               1 { fprintf(yyout, pfJMP, mkslbl(p->place = ++lbl)); }
 
 instrs: NIL                             1 { /**/ }
 instrs: STMT(instrs, instr)             1 { /**/ }
 
-ifexpr: expr                            1 { fprintf(yyout, pfJZ, mklbl(p->place = ++lbl)); }
+%! /* For loop code selection and generation */
 
-ifb: IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
-ifbe: IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, mkelbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
+instr : FOR(fblock, UNTIL(uexpr, expr))  1 { fprintf(yyout, pfJZ, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place));
+                                             printslb(); }
 
-instr: FI(THEN(ifb, elifsi), NIL)                         1 { /**/ }
-instr: FI(THEN(ifbe, elifsi), block)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
-instr: FOR(UNTIL(expr, expr), STEP(block, expr))          1 { /**/ }
-instr: PRINT(expr)                                isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
-instr: PRINT(sexpr)                               isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
-instr: PRINT(vexpr)                               isLeftVec { /**/ } 
-instr: expr                                               1 { fprintf(yyout, pfTRASH, 4); }
-instr: sexpr                                              1 { /**/ }
-instr: vexpr                                              1 { /**/ }
-instr: ALLOC(alloc, lval)                                 1 { fprintf(yyout, pfSTORE); }
+fblock : FBLOCK(fexpr, block)            1 { printrlb(); }
+
+fexpr : instr                            1 { fprintf(yyout, pfJMP, mkflbl(++lbl));
+                                             fprintf(yyout, pfLABEL, mklbl(p->place = ++lbl));
+                                             rlb[++rlbl] = 0; slb[++slbl] = 0; }
+
+uexpr : instr                            1 { fprintf(yyout, pfLABEL, mklbl(flb[flbl--])); }
+
+%! /* If elif else conditions code selection and generation */
+
+instr : FI(THEN(ifb, elifsi), NIL)       1 { /**/ }
+instr : FI(THEN(ifbe, elifsi), block)    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
+
+ifb : IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
+ifbe : IF(ifexpr, block)                 1 { fprintf(yyout, pfJMP pfLABEL, mkelbl(p->place = ++lbl), mklbl(LEFT_CHILD(p)->place)); }
+
+ifexpr : expr                            1 { fprintf(yyout, pfJZ, mklbl(p->place = ++lbl)); }
+
+elifsi : elifs                           1 { --elbl; }
+
+elifs : NIL                              1 { /**/ }
+elifs : ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl(elb[elbl]), mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
+
+%! /* Other instructions code selection and generation */
+
+instr: PRINT(expr)              isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
+instr: PRINT(sexpr)             isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
+instr: PRINT(vexpr)             isLeftVec { /**/ } 
+instr: expr                             1 { fprintf(yyout, pfTRASH, 4); }
+instr: sexpr                            1 { /**/ }
+instr: vexpr                            1 { /**/ }
+instr: ALLOC(alloc, lval)               1 { fprintf(yyout, pfSTORE); }
 
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
-
-elifsi: elifs                           1 { --elbl; }
-
-elifs: NIL                              1 { /**/ }
-elifs: ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl(elb[elbl]), mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 
 ichars: chars                           1 { /**/ }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }

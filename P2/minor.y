@@ -31,7 +31,7 @@ static int ret, cycle;
 %type<n> ints eqbody body ret loop instrs
 %type<n> instr elifs else expr exprs block main
 
-%token FARGS CHARS INTS ADDR VAR ARGS DECL NIL
+%token FARGS CHARS INTS ADDR VAR ARGS DECL NIL FBLOCK
 
 %right ASSOC
 %left '|'
@@ -178,7 +178,7 @@ ret : RETURN                        { $$ = uniNode(RETURN, nilNode(NIL));
 loop : ret                          { $$ = $1; }
      | REPEAT                       { $$ = intNode(REPEAT, 1);
                                       isCycle(); }
-     | STOP                         { $$ = intNode(STOP, 1);
+     | STOP                         { $$ = intNode(STOP, 2);
                                       isCycle(); }
      ;
 
@@ -191,7 +191,7 @@ instrs :                            { $$ = nilNode(NIL); }
 
 instr : IF expr THEN block elifs else FI        { $$ = binNode(FI, binNode(THEN, binNode(IF, $2, $4), $5), $6); }
       | FOR expr UNTIL expr STEP expr DO        { cycle++; }
-        block DONE                              { $$ = binNode(FOR, binNode(UNTIL, $2, $4), binNode(STEP, $9, $6));
+        block DONE                              { $$ = binNode(FOR, binNode(FBLOCK, $2, $9), binNode(UNTIL, $6, $4));
                                                   cycle--; }
       | expr '!'                                { $$ = uniNode('!', $1);
                                                   isPrint($1); }
