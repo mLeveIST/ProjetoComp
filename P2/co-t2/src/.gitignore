@@ -1,0 +1,7 @@
+minor.brg
+lex.yy.c
+yyselect.c
+y.output
+y.tab.c
+y.tab.h
+minor
