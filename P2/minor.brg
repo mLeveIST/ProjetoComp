@@ -49,6 +49,11 @@ static int rlbl = -1; /* Top of useful rlb stack */
 static int slb[60]; /* Stack for for loop stop labels */
 static int slbl = -1; /* Top of useful slb stack */
 
+static char *externs[100];
+static int extcnt;
+
+static int lcvarcnt;
+
 static char *mklbl(int n)
 {
   static char buf[20];
@@ -90,6 +95,9 @@ static char *mkslbl(int n) { return mklbl(slb[++slbl] = n); }
 static int isInt(Node *n) { return tTYPE(n->info) == tINT ? 1 : 1000; }
 static int isStr(Node *n) { return tTYPE(n->info) == tSTR ? 1 : 1000; }
 static int isVec(Node *n) { return tTYPE(n->info) == tVEC ? 1 : 1000; }
+static int isCst(Node *n) { return tTYPE(n->info) == tCNST ? 1 : 1000; }
+static int isFwd(Node *n) { return tTYPE(n->info) == tFWD ? 1 : 1000; }
+static int isPub(Node *n) { return tTYPE(n->info) == tPUB ? 1 : 1000; }
 
 static int isLeftInt(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT ? 1 : 1000; }
 static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 1000; }
@@ -98,6 +106,62 @@ static int isLeftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 
 static void litstr(char *s)
 {
   while (*s) fprintf(yyout, pfCHAR, (unsigned char)*s++);
+}
+
+static void pubvar(int type, char *name)
+{
+  int i;
+
+  if (type & tPUB)
+    fprintf(yyout, pfGLOBL, name, pfOBJ);
+
+  for (i = 0; i < extcnt; i++)
+    if (externs[i] && strcmp(externs[i], name) == 0)
+      externs[i] = 0;
+}
+
+static void numvar(int type, Node *var)
+{
+  if (type & tCNST)
+  {
+    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(var)->value.s, RIGHT_CHILD(var)->value.i);
+  }
+}
+
+static void strvar(int type, Node *var)
+{
+  
+}
+
+static void arrvar(int type, Node *var)
+{
+  
+}
+
+static void testvar(int type, Node *var)
+{
+  if (type & tFWD)
+  {
+    externs[extcnt++] = strdup(LEFT_CHILD(var)->value.s);
+    return;
+  }
+
+  pubvar(type, LEFT_CHILD(var)->value.s);
+
+  switch (var->attrib)
+  {
+    case NUMBER:
+      numvar(type, var);
+      break;
+    case STRING:
+      strvar(type, var);
+      break;
+    case ARRAY:
+      arrvar(type, var);
+      break;
+    default:
+      break;
+  }
 }
 
 %}
@@ -120,7 +184,7 @@ gdecls: NIL                             1 { /**/ }
 gdecls: DECL(gdecls, decl)              1 { /**/ }
 
 decl: NIL                                                 1 { /**/ }
-decl: VAR(vardecl)                                        1 { /**/ }
+decl: VAR(vardecl)                                        1 { /*testvar(p->info, LEFT_CHILD(p));*/ }
 decl: FUNCTION(END(ID, INT), FARGS(fvars, body))          1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { /**/ }
@@ -147,10 +211,12 @@ char: STR                               1 { litstr(p->value.s); }
 ints: INT                               1 { /**/ }
 ints: INTS(ints, INT)                   1 { /**/ }
 
-main: START(mvars, instrs)              1 { /**/ }
+main: START(mvarsb, instrs)             1 { /**/ }
 
-mvars: NIL                              1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL pfENTER, "_main", pfFUNC, "_main", 0); }
-mvars: ARGS(fvars, fvar)                1 { /**/ }
+mvarsb: mvars                           1 { fprintf(yyout, pfENTER, lcvarcnt * 4); }
+
+mvars: NIL                              1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL, "_main", pfFUNC, "_main"); }
+mvars: ARGS(fvars, fvar)                1 { lcvarcnt++; }
 
 body: NIL                               1 { /**/ }
 body: START(fvars, STMT(instrs, ret))   1 { /**/ }
@@ -168,7 +234,7 @@ block: STMT(instrs, STOP)               1 { fprintf(yyout, pfJMP, mkslbl(p->plac
 instrs: NIL                             1 { /**/ }
 instrs: STMT(instrs, instr)             1 { /**/ }
 
-%! /* For loop code selection and generation */
+%! /* For loop code selection and generation (optimized to 1 JZ per cycle) */
 
 instr : FOR(fblock, UNTIL(uexpr, expr))  1 { fprintf(yyout, pfJZ, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place));
                                              printslb(); }
@@ -183,7 +249,7 @@ uexpr : instr                            1 { fprintf(yyout, pfLABEL, mklbl(flb[f
 
 %! /* If elif else conditions code selection and generation */
 
-instr : FI(THEN(ifb, elifsi), NIL)       1 { /**/ }
+instr : FI(THEN(ifb, NIL), NIL)          1 { /**/ }
 instr : FI(THEN(ifbe, elifsi), block)    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place)); }
 
 ifb : IF(ifexpr, block)                  1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
@@ -242,7 +308,7 @@ expr: CALL(ID, exprs)               isInt { /**/ }
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
-sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfADDR, 0, lb); }
+sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, lb); }
 sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
 sexpr: EQ(sexpr, sexpr)             isStr { /**/ }
 sexpr: NE(sexpr, sexpr)             isStr { /**/ }

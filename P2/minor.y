@@ -178,7 +178,7 @@ ret : RETURN                        { $$ = uniNode(RETURN, nilNode(NIL));
 loop : ret                          { $$ = $1; }
      | REPEAT                       { $$ = intNode(REPEAT, 1);
                                       isCycle(); }
-     | STOP                         { $$ = intNode(STOP, 2);
+     | STOP                         { $$ = intNode(STOP, 1);
                                       isCycle(); }
      ;
 

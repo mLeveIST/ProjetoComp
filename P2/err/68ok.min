@@ -1,7 +1,7 @@
 program
   number x
 start
-  for x := 1 until x = 10 step x = x + 1 do
+  for x := 1 until x = 10 step x := x + 1 do
     x! "\n"!
   done
 end
