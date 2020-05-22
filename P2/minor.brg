@@ -191,7 +191,7 @@ gdecls: NIL                             1 { /**/ }
 gdecls: DECL(gdecls, decl)              1 { /**/ }
 
 decl: NIL                                                 1 { /**/ }
-decl: VAR(vardecl)                                        1 { /*testvar(p->info, LEFT_CHILD(p));*/ }
+decl: VAR(vardecl)                                        1 { testvar(p->info, LEFT_CHILD(p)); }
 decl: FUNCTION(END(ID, INT), FARGS(fvars, body))          1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { /**/ }
@@ -201,10 +201,10 @@ fvar: ARRAY(ID, INTS(INT, NIL))         1 { /**/ }
 fvars: NIL                              1 { /**/ }
 fvars: ARGS(fvars, fvar)                1 { /**/ }
 
-vardecl: NUMBER(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, 4); }
-vardecl: NUMBER(ID, INT)                1 { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.i); }
-vardecl: STRING(ID, NIL)                1 { fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, pfWORD); }
-vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR, 0); }
+vardecl: NUMBER(ID, NIL)                1 { /*fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, 4);*/ }
+vardecl: NUMBER(ID, INT)                1 { /*fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.i);*/ }
+vardecl: STRING(ID, NIL)                1 { /*fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, pfWORD);*/ }
+vardecl: STRING(ID, chars)              1 { /*fprintf(yyout, pfCHAR, 0);*/ }
 vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
 vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
 vardecl: ARRAY(ID, INTS(NIL, NIL))      1 { /**/ }
@@ -318,7 +318,7 @@ expr: CALL(ID, exprs)               isInt { /**/ }
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
-sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, lb); }
+sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, mklbl(p->place)); }
 sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
 sexpr: EQ(sexpr, sexpr)             isStr { /**/ }
 sexpr: NE(sexpr, sexpr)             isStr { /**/ }
