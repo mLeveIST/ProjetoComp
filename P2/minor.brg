@@ -328,7 +328,6 @@ instr: PRINT(expr)              isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH
 instr: PRINT(expr)              isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
 instr: PRINT(vexpr)             isLeftVec { /**/ } 
 instr: expr                             1 { fprintf(yyout, pfTRASH, 4); }
-instr: sexpr                            1 { /**/ }
 instr: vexpr                            1 { /**/ }
 instr: ALLOC(alloc, lval)               1 { fprintf(yyout, pfSTORE); }
 
@@ -384,7 +383,6 @@ vexpr: CALL(ID, exprs)              isVec { /**/ }
 
 exprs: NIL                              1 { /**/ }
 exprs: PARAMS(expr, exprs)              1 { /**/ }
-exprs: PARAMS(sexpr, exprs)             1 { /**/ }
 exprs: PARAMS(vexpr, exprs)             1 { /**/ }
 
 %%
