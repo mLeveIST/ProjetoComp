@@ -215,7 +215,7 @@ static int getoffset(char *id)
 
 %term STMT=';' PRINT='!' ALLOC='#' INDEX='[' READ='?'
 %term ADD='+' SUB='-' MULT='*' DIV='/' MOD='%' EXP='^'
-%term EQ='=' LESS='<' GRT='>' AND='&' OR='|' NOT='~'
+%term EQ='=' LT='<' GT='>' AND='&' OR='|' NOT='~'
 %term CALL='(' PARAMS=','
 
 %include "y.tab.h"
@@ -355,15 +355,15 @@ expr: EXP(expr, expr)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH
 expr: EQ(expr, expr)             isArgInt { fprintf(yyout, pfEQ); }
 expr: EQ(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 expr: NE(expr, expr)             isArgInt { fprintf(yyout, pfNE); }
-expr: NE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: NE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 expr: GE(expr, expr)             isArgInt { fprintf(yyout, pfGE); }
-expr: GE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: GE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 expr: LE(expr, expr)             isArgInt { fprintf(yyout, pfLE); }
-expr: LE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: LESS(expr, expr)           isArgInt { fprintf(yyout, pfLT); }
-expr: LESS(expr, expr)           isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: GRT(expr, expr)            isArgInt { fprintf(yyout, pfGT); }
-expr: GRT(expr, expr)            isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: LE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: LT(expr, expr)             isArgInt { fprintf(yyout, pfLT); }
+expr: LT(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: GT(expr, expr)             isArgInt { fprintf(yyout, pfGT); }
+expr: GT(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 expr: AND(and, expr)                    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: OR(or, expr)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: NOT(expr)                         1 { fprintf(yyout, pfIMM pfEQ, 0); }
