@@ -1,5 +1,5 @@
 
-extern int _power(int base, int exp)
+int power(int base, int exp)
 {
   int i = exp;
   int res = 1;
@@ -13,7 +13,7 @@ extern int _power(int base, int exp)
   return res;
 }
 
-extern int _strcompr(const char *a, const char *b)
+int strcompr(const char *a, const char *b)
 {
   unsigned char c1, c2;
 
