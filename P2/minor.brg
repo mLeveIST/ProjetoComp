@@ -347,35 +347,33 @@ exprval: expr                           1 { fprintf(yyout, pfDUP); }
 expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
-expr: ADD(expr, expr)            isResInt { fprintf(yyout, pfADD); }
-expr: SUB(expr, expr)            isResInt { fprintf(yyout, pfSUB); }
+expr: ADD(expr, expr)            isArgInt { fprintf(yyout, pfADD); }
+expr: SUB(expr, expr)            isArgInt { fprintf(yyout, pfSUB); }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
 expr: EXP(expr, expr)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_power", 8, "_power"); }
 expr: EQ(expr, expr)             isArgInt { fprintf(yyout, pfEQ); }
 expr: EQ(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: NE(expr, expr)             isResInt { fprintf(yyout, pfNE); }
-expr: GE(expr, expr)             isResInt { fprintf(yyout, pfGE); }
-expr: LE(expr, expr)             isResInt { fprintf(yyout, pfLE); }
-expr: LESS(expr, expr)           isResInt { fprintf(yyout, pfLT); }
-expr: GRT(expr, expr)            isResInt { fprintf(yyout, pfGT); }
+expr: NE(expr, expr)             isArgInt { fprintf(yyout, pfNE); }
+expr: NE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: GE(expr, expr)             isArgInt { fprintf(yyout, pfGE); }
+expr: GE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: LE(expr, expr)             isArgInt { fprintf(yyout, pfLE); }
+expr: LE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: LESS(expr, expr)           isArgInt { fprintf(yyout, pfLT); }
+expr: LESS(expr, expr)           isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: GRT(expr, expr)            isArgInt { fprintf(yyout, pfGT); }
+expr: GRT(expr, expr)            isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 expr: AND(and, expr)                    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: OR(or, expr)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: NOT(expr)                         1 { fprintf(yyout, pfIMM pfEQ, 0); }
 expr: UMINUS(expr)                      1 { fprintf(yyout, pfNEG); }
-expr: ASSOC(exprval, lval)       isResInt { fprintf(yyout, pfSTORE); }
+expr: ASSOC(exprval, lval)       isArgInt { fprintf(yyout, pfSTORE); }
 expr: CALL(ID, exprs)            isResInt { /**/ }
 
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
-
-sexpr: NE(sexpr, sexpr)          isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: GE(sexpr, sexpr)          isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: LE(sexpr, sexpr)          isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: LESS(sexpr, sexpr)        isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: GRT(sexpr, sexpr)         isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: CALL(ID, exprs)           isResStr { /**/ }
 
 vexpr: lval                             1 { /**/ }
 vexpr: ADDR(lval)                       1 { /**/ }

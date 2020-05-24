@@ -1,4 +1,4 @@
 program
 start
-  "abc" = "abc" !
+  "abc" = "abc" ! "\n"!
 end
