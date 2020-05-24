@@ -325,7 +325,7 @@ elifs : ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl
 %! /* Other instructions code selection and generation */
 
 instr: PRINT(expr)              isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
-instr: PRINT(sexpr)             isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
+instr: PRINT(expr)              isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
 instr: PRINT(vexpr)             isLeftVec { /**/ } 
 instr: expr                             1 { fprintf(yyout, pfTRASH, 4); }
 instr: sexpr                            1 { /**/ }
@@ -334,7 +334,7 @@ instr: ALLOC(alloc, lval)               1 { fprintf(yyout, pfSTORE); }
 
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
-ichars: chars                           1 { /**/ }  
+ichars: chars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, mklbl(p->place)); }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 
@@ -370,14 +370,11 @@ expr: CALL(ID, exprs)            isResInt { /**/ }
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
-sexpr: ichars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, mklbl(p->place)); }
-sexpr: lval                             1 { fprintf(yyout, pfLOAD); }
 sexpr: NE(sexpr, sexpr)          isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 sexpr: GE(sexpr, sexpr)          isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 sexpr: LE(sexpr, sexpr)          isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 sexpr: LESS(sexpr, sexpr)        isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 sexpr: GRT(sexpr, sexpr)         isResStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-sexpr: ASSOC(sexpr, lval)        isResStr { fprintf(yyout, pfSTORE); }
 sexpr: CALL(ID, exprs)           isResStr { /**/ }
 
 vexpr: lval                             1 { /**/ }
