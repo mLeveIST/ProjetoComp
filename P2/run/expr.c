@@ -1,4 +1,9 @@
 
+#ifdef underscore
+#define power _power
+#define strcompr _strcompr
+#endif
+
 int power(int base, int exp)
 {
   int i = exp;
