@@ -380,7 +380,7 @@ ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)
 
 lval: ID                            isGlb { fprintf(yyout, pfADDR, p->value.s); }
 lval: ID                            isLoc { fprintf(yyout, pfLOCAL, getoffset(p->value.s) * 4); }
-lval: INDEX(expr, ID)                   1 { fprintf(yyout, pfIMM pfMUL pfADDR pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
+lval: INDEX(expr, ID)                   1 { fprintf(yyout, pfIMM pfMUL pfADDRV pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
 
 exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
