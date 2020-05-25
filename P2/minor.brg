@@ -374,7 +374,7 @@ instr: PRINT(expr)              isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH
 instr: PRINT(vexpr)             isLeftVec { /**/ } 
 instr: expr                             1 { fprintf(yyout, pfTRASH, 4); }
 instr: vexpr                            1 { /**/ }
-instr: ALLOC(alloc, slval)              1 { /**/ }
+instr: ALLOC(alloc, lval)               1 { fprintf(yyout, pfSTORE); }
 
 alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
@@ -382,20 +382,15 @@ ichars: chars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 
-llval: ID                           isGlb { fprintf(yyout, pfADDRV, p->value.s); }
-llval: ID                           isLoc { fprintf(yyout, pfLOCV, getoffset(p->value.s) * 4); }
-llval: INDEX(expr, ID)         isRightGlb { fprintf(yyout, pfIMM pfMUL pfADDRV pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
-llval: INDEX(expr, ID)         isRightLoc { fprintf(yyout, pfIMM pfMUL pfLOCV pfADD, pfWORD * -1, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
-
-slval: ID                           isGlb { fprintf(yyout, pfADDRA, p->value.s); }
-slval: ID                           isLoc { fprintf(yyout, pfLOCA, getoffset(p->value.s) * 4); }
-slval: INDEX(expr, ID)         isRightGlb { fprintf(yyout, pfIMM pfMUL pfADDR pfADD pfSTORE, pfWORD, RIGHT_CHILD(p)->value.s); }
-slval: INDEX(expr, ID)         isRightLoc { fprintf(yyout, pfIMM pfMUL pfLOCAL pfADD pfSTORE, pfWORD * -1, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
+lval: ID                           isGlb { fprintf(yyout, pfADDR, p->value.s); }
+lval: ID                           isLoc { fprintf(yyout, pfLOCAL, getoffset(p->value.s) * 4); }
+lval: INDEX(expr, ID)         isRightGlb { fprintf(yyout, pfIMM pfMUL pfADDRV pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
+lval: INDEX(expr, ID)         isRightLoc { fprintf(yyout, pfIMM pfMUL pfLOCV pfADD, pfWORD * -1, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
 
 exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
 expr: ichars                            1 { /**/ }
-expr: llval                             1 { /**/ }
+expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
 expr: ADD(expr, expr)            isArgInt { fprintf(yyout, pfADD); }
 expr: SUB(expr, expr)            isArgInt { fprintf(yyout, pfSUB); }
@@ -419,17 +414,17 @@ expr: AND(and, expr)                    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_C
 expr: OR(or, expr)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: NOT(expr)                         1 { fprintf(yyout, pfIMM pfEQ, 0); }
 expr: UMINUS(expr)                      1 { fprintf(yyout, pfNEG); }
-expr: ASSOC(exprval, slval)      isArgInt { /**/ }
+expr: ASSOC(exprval, lval)       isArgInt { fprintf(yyout, pfSTORE); }
 expr: CALL(ID, exprs)            isResInt { /**/ }
 
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
-vexpr: llval                             1 { /**/ }
-vexpr: ADDR(llval)                       1 { /**/ }
+vexpr: lval                              1 { /**/ }
+vexpr: ADDR(lval)                        1 { /**/ }
 vexpr: ADD(expr, vexpr)             isVec { /**/ }
 vexpr: SUB(vexpr, vexpr)            isVec { /**/ }
-vexpr: ASSOC(vexpr, slval)           isVec { /**/ }
+vexpr: ASSOC(vexpr, lval)            isVec { /**/ }
 vexpr: CALL(ID, exprs)              isVec { /**/ }
 
 exprs: NIL                              1 { /**/ }
