@@ -168,7 +168,7 @@ static int varqualif(int type, char* name)
   if (type & tFWD)
   {
     externs[extcnt++] = strdup(name);
-    return tFWD;
+    return 0;
   }
 
   if (type & tPUB)
@@ -178,7 +178,7 @@ static int varqualif(int type, char* name)
     if (externs[i] && strcmp(externs[i], name) == 0)
       externs[i] = 0;
 
-  return 0;
+  return 1;
 }
 
 static void arrvar(Node *id, int arrlbl)
