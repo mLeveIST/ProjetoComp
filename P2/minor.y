@@ -147,13 +147,18 @@ char : INT                          { $$ = TINT($1);
      ;
 
 eqvec :                             { $$ = nilNode(NIL); }
-      | ASSOC ints                  { $$ = $2; }
+      | ASSOC ints                  { $$ = $2;
+                                      $$->info = $2->info; }
       ;
 
-ints : INT                          { $$ = intNode(INT, $1); }
-     | '-' INT                      { $$ = intNode(INT, -$2); }
-     | ints ',' INT                 { $$ = binNode(INTS, $1, intNode(INT, $3)); }
-     | ints ',' '-' INT             { $$ = binNode(INTS, $1, intNode(INT, -$4)); }
+ints : INT                          { $$ = intNode(INT, $1); 
+                                      $$->info = 1; }
+     | '-' INT                      { $$ = intNode(INT, -$2); 
+                                      $$->info = 1; }
+     | ints ',' INT                 { $$ = binNode(INTS, $1, intNode(INT, $3));
+                                      $$->info = $1->info + 1; }
+     | ints ',' '-' INT             { $$ = binNode(INTS, $1, intNode(INT, -$4));
+                                      $$->info = $1->info + 1; }
      ;
 
 eqbody : DONE                       { $$ = nilNode(NIL); }

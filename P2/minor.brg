@@ -114,6 +114,7 @@ static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 
 static int isLeftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 
 static int isPub(Node *n) { return (n->info & tPUB) == 1 ? 1 : 1000; }
+static int isFwd(Node *n) { return (n->info & tFWD) == 1 ? 1 : 1000; }
 
 static int isGlb(Node *n) { return IDfind(n->value.s, ((void**) IDtest)) >= 0 ? 1 : 1000; }
 static int isLoc(Node *n) { return IDfind(n->value.s, ((void**) IDtest)) < 0 ? 1 : 1000; }
@@ -160,9 +161,48 @@ static void strvar(int type, Node *var)
     fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, LEFT_CHILD(var)->value.s, mklbl(RIGHT_CHILD(var)->place));
 }
 
-static void arrvar(int type, Node *var)
+static int varqualif(int type, char* name)
 {
+  int i;
   
+  if (type & tFWD)
+  {
+    externs[extcnt++] = strdup(name);
+    return tFWD;
+  }
+
+  if (type & tPUB)
+    fprintf(yyout, pfGLOBL, name, pfOBJ);
+
+  for (i = 0; i < extcnt; i++)
+    if (externs[i] && strcmp(externs[i], name) == 0)
+      externs[i] = 0;
+
+  return 0;
+}
+
+static void arrvar(Node *id, int arrlbl)
+{
+  int type = id->info;
+  char *name = id->value.s;
+
+  if (!varqualif(type, name))
+    return;
+
+  if (type & tCNST)
+    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
+  else if (!arrlbl)
+    fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, name, pfWORD);
+  else
+    fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
+}
+
+static void initarray(int dim, int inited)
+{
+  int init = dim - inited;
+
+  while (init--)
+    fprintf(yyout, pfINTEGER, 0);
 }
 
 static void testvar(int type, Node *var)
@@ -184,7 +224,6 @@ static void testvar(int type, Node *var)
       strvar(type, var);
       break;
     case ARRAY:
-      arrvar(type, var);
       break;
     default:
       break;
@@ -251,14 +290,11 @@ fvar: ARRAY(ID, INTS(INT, NIL))         1 { IDnew(-1, LEFT_CHILD(p)->value.s, -(
 fvars: NIL                              1 { /**/ }
 fvars: ARGS(fvars, fvar)                1 { /**/ }
 
-vardecl: NUMBER(ID, NIL)                1 { /*fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, 4);*/ }
-vardecl: NUMBER(ID, INT)                1 { /*fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.i);*/ }
-vardecl: STRING(ID, NIL)                1 { /*fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(p)->value.s, pfWORD);*/ }
+vardecl: NUMBER(ID, NIL)                1 { /**/ }
+vardecl: NUMBER(ID, INT)                1 { /**/ }
+vardecl: STRING(ID, NIL)                1 { /**/ }
 vardecl: STRING(ID, chars)              1 { fprintf(yyout, pfCHAR, 0); }
-vardecl: ARRAY(ID, INTS(INT, NIL))      1 { /**/ }
-vardecl: ARRAY(ID, INTS(INT, ints))     1 { /**/ }
-vardecl: ARRAY(ID, INTS(NIL, NIL))      1 { /**/ }
-vardecl: ARRAY(ID, INTS(NIL, ints))     1 { /**/ }
+vardecl: ARRAY(ID, array)               1 { arrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
 
 chars: NIL                              1 { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
 chars: CHARS(chars, char)               1 { p->place = LEFT_CHILD(p)->place; }
@@ -267,8 +303,13 @@ char: INT                               1 { fprintf(yyout, pfCHAR, (unsigned cha
 char: CHAR                              1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
 char: STR                               1 { litstr(p->value.s); }
 
-ints: INT                               1 { /**/ }
-ints: INTS(ints, INT)                   1 { /**/ }
+array: INTS(INT, NIL)                   1 { initarray(LEFT_CHILD(p)->value.i, 0); }
+array: INTS(INT, ints)                  1 { p->place = RIGHT_CHILD(p)->place;
+                                            initarray(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info); }
+
+ints: INT                               1 { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, mklbl(p->place = ++lbl), p->value.i); }
+ints: INTS(ints, INT)                   1 { fprintf(yyout, pfINTEGER, RIGHT_CHILD(p)->value.i);
+                                            p->place = LEFT_CHILD(p)->place; }
 
 main: START(mvarsb, instrs)             1 { lcvarcnt = 0; }
 
