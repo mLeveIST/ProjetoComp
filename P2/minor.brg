@@ -164,7 +164,7 @@ static void strvar(int type, Node *var)
 static int varqualif(int type, char* name)
 {
   int i;
-  
+
   if (type & tFWD)
   {
     externs[extcnt++] = strdup(name);
@@ -191,7 +191,7 @@ static void arrvar(Node *id, int arrlbl)
 
   if (type & tCNST)
     fprintf(yyout, pfRODATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
-  else if (!arrlbl)
+  else if (arrlbl == -1)
     fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, name, pfWORD);
   else
     fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
