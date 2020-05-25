@@ -199,7 +199,7 @@ static void arrvar(Node *id, int arrlbl)
 
 static void initarray(int dim, int inited)
 {
-  int init = dim - inited;
+  int init = (dim - inited) < 0 ? inited : (dim - inited);
 
   while (init--)
     fprintf(yyout, pfINTEGER, 0);
