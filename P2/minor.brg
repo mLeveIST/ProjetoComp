@@ -199,9 +199,9 @@ static void arrvar(Node *id, int arrlbl)
 
 static void initarray(int dim, int inited)
 {
-  int init = (dim - inited) < 0 ? inited : (dim - inited);
+  int init = dim - inited;
 
-  while (init--)
+  while (init-- > 0)
     fprintf(yyout, pfINTEGER, 0);
 }
 
