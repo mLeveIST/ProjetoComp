@@ -118,6 +118,8 @@ static int isFwd(Node *n) { return (n->info & tFWD) == 1 ? 1 : 1000; }
 
 static int isGlb(Node *n) { return IDfind(n->value.s, ((void**) IDtest)) >= 0 ? 1 : 1000; }
 static int isLoc(Node *n) { return IDfind(n->value.s, ((void**) IDtest)) < 0 ? 1 : 1000; }
+static int isRightGlb(Node *n) { return IDfind(RIGHT_CHILD(n)->value.s, ((void**) IDtest)) >= 0 ? 1 : 1000; }
+static int isRightLoc(Node *n) { return IDfind(RIGHT_CHILD(n)->value.s, ((void**) IDtest)) < 0 ? 1 : 1000; }
 
 static void litstr(char *s)
 {
@@ -197,7 +199,7 @@ static void arrvar(Node *id, int arrlbl)
     fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
 }
 
-static void initarray(int dim, int inited)
+static void initarr(int dim, int inited)
 {
   int init = dim - inited;
 
@@ -245,7 +247,7 @@ static void testfunc(int type, Node *var)
 
 static int getoffset(char *id)
 {
-  int offset;
+  static int offset;
   IDfind(id, (void*) &offset);
   return offset;
 }
@@ -285,7 +287,8 @@ fargs: ARGS(fargs, farg)                1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { IDnew(-1, LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
 fvar: STRING(ID, NIL)                   1 { IDnew(-1, LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
-fvar: ARRAY(ID, INTS(INT, NIL))         1 { IDnew(-1, LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
+fvar: ARRAY(ID, INTS(INT, NIL))         1 { IDnew(-1, LEFT_CHILD(p)->value.s, -(++lcvarcnt));
+                                            lcvarcnt += LEFT_CHILD(RIGHT_CHILD(p))->value.i; }
 
 fvars: NIL                              1 { /**/ }
 fvars: ARGS(fvars, fvar)                1 { /**/ }
@@ -303,9 +306,10 @@ char: INT                               1 { fprintf(yyout, pfCHAR, (unsigned cha
 char: CHAR                              1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
 char: STR                               1 { litstr(p->value.s); }
 
-array: INTS(INT, NIL)                   1 { initarray(LEFT_CHILD(p)->value.i, 0); }
+array: INTS(INT, NIL)                   1 { fprintf(yyout, pfDATA pfALIGN pfLABEL, mklbl(p->place = ++lbl));
+                                            initarr(LEFT_CHILD(p)->value.i, 0); }
 array: INTS(INT, ints)                  1 { p->place = RIGHT_CHILD(p)->place;
-                                            initarray(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info); }
+                                            initarr(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info); }
 
 ints: INT                               1 { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, mklbl(p->place = ++lbl), p->value.i); }
 ints: INTS(ints, INT)                   1 { fprintf(yyout, pfINTEGER, RIGHT_CHILD(p)->value.i);
@@ -380,7 +384,8 @@ ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)
 
 lval: ID                            isGlb { fprintf(yyout, pfADDR, p->value.s); }
 lval: ID                            isLoc { fprintf(yyout, pfLOCAL, getoffset(p->value.s) * 4); }
-lval: INDEX(expr, ID)                   1 { fprintf(yyout, pfIMM pfMUL pfADDRV pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
+lval: INDEX(expr, ID)          isRightGlb { fprintf(yyout, pfIMM pfMUL pfADDRV pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
+lval: INDEX(expr, ID)          isRightLoc { fprintf(yyout, pfIMM pfMUL pfLOCV pfADD, pfWORD * -1, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
 
 exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
