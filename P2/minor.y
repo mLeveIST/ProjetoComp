@@ -73,7 +73,8 @@ decl : qualif const vardecl         { $$ = uniNode(VAR, $3);
      | FUNCTION qualif ftype ID     { isFunc( func = $4, ret = $2+$3+tFUNC);
                                       IDpush(); }
        eqbody                       { $$ = binNode(FUNCTION, binNode(END, TID($4), TINT(ret)), binNode(FARGS, nilNode(NIL), $6));
-                                      IDpop(); isFwd(func, ret, $6); }
+                                      IDpop();
+                                      isFwd(func, ret, $6); }
      | error                        { $$ = nilNode(NIL); }
      ;
 
