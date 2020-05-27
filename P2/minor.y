@@ -85,7 +85,8 @@ fvar : NUMBER ID                    { $$ = binNode(NUMBER, TID($2), nilNode(NIL)
                                       $$->info = tVEC; }
      ;
 
-fvars : fvar                        { $$ = binNode(ARGS, nilNode(NIL), $1);
+fvars : fvar                        { $$ = binNode(ARGS, nilNode(NIL), $1); 
+                                      $$->SUB(0)->info = tCNST;
                                       IDnew($1->info, $1->SUB(0)->value.s, $1->SUB(1)); }
       | fvars ';' fvar              { $$ = binNode(ARGS, $1, $3);
                                       IDnew($3->info, $3->SUB(0)->value.s, $3->SUB(1)); }
@@ -146,7 +147,8 @@ char : INT                          { $$ = TINT($1);
                                       $$->info = tSTR; }
      ;
 
-eqvec :                             { $$ = nilNode(NIL); }
+eqvec :                             { $$ = nilNode(NIL);
+                                      $$->info = 0; }
       | ASSOC ints                  { $$ = $2;
                                       $$->info = $2->info; }
       ;
