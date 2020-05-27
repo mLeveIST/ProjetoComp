@@ -346,7 +346,8 @@ gdecls: DECL(gdecls, decl)              1 { /**/ }
 
 decl: NIL                                                 1 { /**/ }
 decl: VAR(vardecl)                                        1 { /**/ }
-decl: FUNCTION(fend, FARGS(fargs, body))                  1 { IDpop(); }
+decl: FUNCTION(fend, FARGS(fargs, body))                  1 { fprintf(yyout, pfIMM pfPOP pfLEAVE pfRET, 0);
+                                                              IDpop(); }
 
 farg: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 farg: STRING(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
