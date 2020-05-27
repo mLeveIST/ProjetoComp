@@ -116,12 +116,14 @@ static int isArgStr(Node *n)
 
 static int isArgVec(Node *n)
 {
-  return (tTYPE(LEFT_CHILD(n)->info) == tVEC || tTYPE(RIGHT_CHILD(n)->info) == tVEC) ? 1 : 1000;
+  return (tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(RIGHT_CHILD(n)->info) == tVEC) ? 1 : 1000;
 }
 
 static int isLeftInt(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT ? 1 : 1000; }
 static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 1000; }
-static int isLeftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 1000; }
+
+static int isLftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 1000; }
+static int isRgtVec(Node *n) { return tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 
 static int isPub(Node *n) { return (n->info & tPUB) == 1 ? 1 : 1000; }
 static int isFwd(Node *n) { return (n->info & tFWD) == 1 ? 1 : 1000; }
@@ -288,14 +290,13 @@ static int getoffset(char *id)
 static void indexation(char *id, int type)
 {
   Node *offset;
-  int isLoc = IDfind(id, (void**) &offset) == -1;
 
   if (tTYPE(type) == tVEC)
     fprintf(yyout, pfIMM pfMUL, pfWORD);
   else if (tTYPE(type) == tSTR)
     fprintf(yyout, pfIMM pfMUL, 1);
 
-  if (isLoc)
+  if (IDfind(id, (void**) &offset) == -1)
     fprintf(yyout, pfLOCV pfADD, (int) offset->place * 4);
   else
     fprintf(yyout, pfADDRV pfADD, id);
@@ -312,7 +313,6 @@ static void association(int type)
 static void allocation(char *id, int type)
 {
   Node *offset;
-  int isLoc = IDfind(id, (void**) &offset) == -1;
 
   if (tTYPE(type) == tVEC)
     fprintf(yyout, pfIMM, pfWORD);
@@ -321,10 +321,35 @@ static void allocation(char *id, int type)
 
   fprintf(yyout, pfMUL pfALLOC pfSP);
 
-  if (isLoc)
+  if (IDfind(id, (void**) &offset) == -1)
     fprintf(yyout, pfLOCA, (int) offset->place * 4);
   else
     fprintf(yyout, pfADDRA, id);
+}
+
+static void vectoradd(char *id)
+{
+  Node *offset;
+
+  if (IDfind(id, (void**) &offset) == -1)
+    fprintf(yyout, pfLOCV pfADD, (int) offset->place * 4);
+  else
+    fprintf(yyout, pfADDRV pfADD, id);
+}
+
+static void vectorsub(char *id1, char *id2)
+{
+  Node *offset;
+
+  if (IDfind(id1, (void**) &offset) == -1)
+    fprintf(yyout, pfLOCV, (int) offset->place * 4);
+  else
+    fprintf(yyout, pfADDRV, id1);
+
+  if (IDfind(id2, (void**) &offset) == -1)
+    fprintf(yyout, pfLOCV pfSUB, (int) offset->place * 4);
+  else
+    fprintf(yyout, pfADDRV pfSUB, id2);
 }
 
 %}
@@ -480,9 +505,10 @@ expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
 expr: ADDR(lval)                        1 { /**/ }
 expr: ADD(expr, expr)            isArgInt { fprintf(yyout, pfADD); }
-expr: ADD(expr, expr)            isArgVec { /**/ }
+expr: ADD(ID, expr)              isLftVec { vectoradd(LEFT_CHILD(p)->value.s); }
+expr: ADD(expr, ID)              isRgtVec { vectoradd(RIGHT_CHILD(p)->value.s); }
 expr: SUB(expr, expr)            isArgInt { fprintf(yyout, pfSUB); }
-expr: SUB(expr, expr)            isArgVec { /**/ }
+expr: SUB(ID, ID)                isArgVec { vectorsub(LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.s); }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
