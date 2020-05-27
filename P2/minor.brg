@@ -58,7 +58,7 @@ static char *externs[100];
 static int extcnt;
 
 static int lcvarcnt;
-static int argcnt = 1;
+static int argcnt;
 
 static int imut;
 
@@ -341,7 +341,7 @@ fend: END(ID, INT)                      1 { func(LEFT_CHILD(p)->value.s, RIGHT_C
 decls: gdecls                           1 { /**/ }
 
 gdecls: NIL                             1 { /**/ }
-gdecls: DECL(gdecls, decl)              1 { argcnt = 0; lcvarcnt = 0; }
+gdecls: DECL(gdecls, decl)              1 { /**/ }
 
 decl: NIL                                                 1 { /**/ }
 decl: VAR(vardecl)                                        1 { /**/ }
@@ -351,7 +351,7 @@ farg: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argc
 farg: STRING(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 farg: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 
-fargs: NIL                        setImut { argcnt = 0; }
+fargs: NIL                        setImut { argcnt = 1; }
 fargs: ARGS(fargs, farg)                1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
