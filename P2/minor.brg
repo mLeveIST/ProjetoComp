@@ -100,30 +100,18 @@ static char *mkflbl(int n) { return mklbl(flb[++flbl] = n); }
 static char *mkrlbl(int n) { return mklbl(rlb[++rlbl] = n); }
 static char *mkslbl(int n) { return mklbl(slb[++slbl] = n); }
 
-static int isResInt(Node *n) { return tTYPE(n->info) == tINT ? 1 : 1000; }
-static int isResStr(Node *n) { return tTYPE(n->info) == tSTR ? 1 : 1000; }
-static int isResVec(Node *n) { return tTYPE(n->info) == tVEC ? 1 : 1000; }
+static int isInt(Node *n) { return tTYPE(n->info) == tINT ? 1 : 1000; }
+static int isIntU(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT ? 1 : 1000; }
+static int isIntB(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT && tTYPE(RIGHT_CHILD(n)->info) == tINT ? 1 : 1000; }
 
-static int isArgInt(Node *n)
-{
-  return (tTYPE(LEFT_CHILD(n)->info) == tINT && tTYPE(RIGHT_CHILD(n)->info) == tINT) ? 1 : 1000;
-}
+static int isStr(Node *n) { return tTYPE(n->info) == tSTR ? 1 : 1000; }
+static int isStrU(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 1000; }
+static int isStrB(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR && tTYPE(RIGHT_CHILD(n)->info) == tSTR ? 1 : 1000; }
 
-static int isArgStr(Node *n)
-{
-  return (tTYPE(LEFT_CHILD(n)->info) == tSTR && tTYPE(RIGHT_CHILD(n)->info) == tSTR) ? 1 : 1000;
-}
-
-static int isArgVec(Node *n)
-{
-  return (tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(RIGHT_CHILD(n)->info) == tVEC) ? 1 : 1000;
-}
-
-static int isLeftInt(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT ? 1 : 1000; }
-static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 1000; }
-
-static int isLftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 1000; }
-static int isRgtVec(Node *n) { return tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
+static int isVec(Node *n) { return tTYPE(n->info) == tVEC ? 1 : 1000; }
+static int isVecL(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(RIGHT_CHILD(n)->info) != tVEC ? 1 : 1000; }
+static int isVecR(Node *n) { return tTYPE(LEFT_CHILD(n)->info) != tVEC && tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
+static int isVecB(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 
 static int isPub(Node *n) { return (n->info & tPUB) ? 1 : 1000; }
 static int isFwd(Node *n) { return (n->info & tFWD) ? 1 : 1000; }
@@ -324,19 +312,7 @@ static void vectoradd(char *id)
     fprintf(yyout, pfADDRV pfADD, id);
 }
 
-static void vectorsub(char *id)
-{
-  Node *offset;
-
-  fprintf(yyout, pfIMM pfMUL, pfWORD);
-
-  if (IDfind(id, (void**) &offset) == -1)
-    fprintf(yyout, pfLOCV pfSUB, (int) offset->place * 4);
-  else
-    fprintf(yyout, pfADDRV pfSUB, id);
-}
-
-static void vectorsub2(char *id1, char *id2)
+static void vectorsub(char *id1, char *id2)
 {
   Node *offset;
 
@@ -476,8 +452,8 @@ elifs : ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl
 
 %! /* Print code selection and generation */
 
-instr: PRINT(expr)              isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
-instr: PRINT(expr)              isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
+instr: PRINT(expr)                 isIntU { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
+instr: PRINT(expr)                 isStrU { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
 
 
 %! /* Allocation code selection and generation */
@@ -500,31 +476,24 @@ expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
 expr: ADDR(lval)                        1 { /**/ }
-expr: ADD(expr, expr)            isArgInt { fprintf(yyout, pfADD); }
-expr: ADD(ID, expr)              isLftVec { vectoradd(LEFT_CHILD(p)->value.s); }
-expr: ADD(expr, ID)              isRgtVec { vectoradd(RIGHT_CHILD(p)->value.s); }
-expr: SUB(expr, expr)            isArgInt { fprintf(yyout, pfSUB); }
-expr: SUB(subid, expr)           isLftVec { fprintf(yyout, pfIMM pfMUL pfSUB, pfWORD); }
-subid: ID                           isGlb { fprintf(yyout, pfADDRV, p->value.s); }
-subid: ID                           isLoc { fprintf(yyout, pfLOCV, getoffset(p->value.s) * 4); }
-expr: SUB(expr, ID)              isRgtVec { vectorsub(RIGHT_CHILD(p)->value.s); }
-expr: SUB(ID, ID)                isArgVec { vectorsub2(LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.s); }
+expr: ADD(expr, expr)              isIntB { fprintf(yyout, pfADD); }
+expr: SUB(expr, expr)              isIntB { fprintf(yyout, pfSUB); }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
 expr: EXP(expr, expr)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_power", 8, "_power"); }
-expr: EQ(expr, expr)             isArgInt { fprintf(yyout, pfEQ); }
-expr: EQ(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: NE(expr, expr)             isArgInt { fprintf(yyout, pfNE); }
-expr: NE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: GE(expr, expr)             isArgInt { fprintf(yyout, pfGE); }
-expr: GE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: LE(expr, expr)             isArgInt { fprintf(yyout, pfLE); }
-expr: LE(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: LT(expr, expr)             isArgInt { fprintf(yyout, pfLT); }
-expr: LT(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
-expr: GT(expr, expr)             isArgInt { fprintf(yyout, pfGT); }
-expr: GT(expr, expr)             isArgStr { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: EQ(expr, expr)               isIntB { fprintf(yyout, pfEQ); }
+expr: EQ(expr, expr)               isStrB { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfEQ pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: NE(expr, expr)               isIntB { fprintf(yyout, pfNE); }
+expr: NE(expr, expr)               isStrB { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfNE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: GE(expr, expr)               isIntB { fprintf(yyout, pfGE); }
+expr: GE(expr, expr)               isStrB { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: LE(expr, expr)               isIntB { fprintf(yyout, pfLE); }
+expr: LE(expr, expr)               isStrB { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLE pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: LT(expr, expr)               isIntB { fprintf(yyout, pfLT); }
+expr: LT(expr, expr)               isStrB { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfLT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
+expr: GT(expr, expr)               isIntB { fprintf(yyout, pfGT); }
+expr: GT(expr, expr)               isStrB { fprintf(yyout, pfSWAP pfCALL pfTRASH pfPUSH pfIMM pfGT pfEXTRN, "_strcompr", 8, 0, "_strcompr"); }
 expr: AND(and, expr)                    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: OR(or, expr)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: NOT(expr)                         1 { fprintf(yyout, pfIMM pfEQ, 0); }
@@ -532,13 +501,35 @@ expr: UMINUS(expr)                      1 { fprintf(yyout, pfNEG); }
 expr: ASSOC(exprval, ID)       isRightGlb { fprintf(yyout, pfADDRA, RIGHT_CHILD(p)->value.s); }
 expr: ASSOC(exprval, ID)       isRightLoc { fprintf(yyout, pfLOCA, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
 expr: ASSOC(exprval, lval)              1 { association(RIGHT_CHILD(RIGHT_CHILD(p))->info); }
-expr: CALL(ID, exprs)            isResInt { /**/ }
+expr: CALL(ID, exprs)                   1 { /**/ }
 
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
 exprs: NIL                              1 { /**/ }
 exprs: PARAMS(expr, exprs)              1 { /**/ }
+
+
+%! /* Pointer arithmetic code selection and generation */
+
+expr : ADD(expr, expr)             isVecL { fprintf(yyout, pfIMM pfMUL pfADD, pfWORD); }
+expr : ADD(intexpr, expr)          isVecR { fprintf(yyout, pfADD); }
+
+expr : SUB(expr, expr)             isVecL { fprintf(yyout, pfIMM pfMUL pfSUB, pfWORD); }
+expr : SUB(intexpr, expr)          isVecR { fprintf(yyout, pfSUB); }
+expr : SUB(expr, expr)             isVecB { fprintf(yyout, pfSUB); }
+
+intexpr : expr                          1 { fprintf(yyout, pfIMM pfMUL, pfWORD); }
+
+expr : ADD(expr, ID)               isVecR { vectoradd(RIGHT_CHILD(p)->value.s); }
+expr : ADD(ID, expr)               isVecL { vectoradd(LEFT_CHILD(p)->value.s); }
+
+expr : SUB(expr, subid)            isVecR { fprintf(yyout, pfIMM pfMUL pfSUB, pfWORD); }
+expr : SUB(subid, expr)            isVecL { fprintf(yyout, pfIMM pfMUL pfSUB, pfWORD); }
+subid : ID                          isGlb { fprintf(yyout, pfADDRV, p->value.s); }
+subid : ID                          isLoc { fprintf(yyout, pfLOCV, getoffset(p->value.s) * 4); }
+
+expr : SUB(ID, ID)                 isVecB { vectorsub(LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.s); }
 
 %%
 
