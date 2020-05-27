@@ -150,7 +150,7 @@ static int qualifs(int type, char* name)
   if (type & tPUB)
   {
     if (type & tFUNC)
-      fprintf(yyout, pfGLOBL, name, pfFUNC);
+      fprintf(yyout, pfGLOBL, mkfunc(name), pfFUNC);
     else
       fprintf(yyout, pfGLOBL, name, pfOBJ);
   }
