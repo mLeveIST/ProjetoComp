@@ -115,6 +115,7 @@ static int isVecB(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(
 
 static int isPub(Node *n) { return (n->info & tPUB) ? 1 : 1000; }
 static int isFwd(Node *n) { return (n->info & tFWD) ? 1 : 1000; }
+static int isFunc(Node *n) { return (n->info & tFUNC) ? 1 : 1000; }
 
 static int setImut(Node *n)
 {
@@ -488,6 +489,7 @@ expr: ASSOC(exprval, ID)       isRightGlb { fprintf(yyout, pfADDRA, RIGHT_CHILD(
 expr: ASSOC(exprval, ID)       isRightLoc { fprintf(yyout, pfLOCA, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
 expr: ASSOC(exprval, lval)              1 { association(RIGHT_CHILD(RIGHT_CHILD(p))->info); }
 expr: CALL(ID, exprs)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH, mkfunc(LEFT_CHILD(p)->value.s), argcnt * pfWORD); }
+expr: ID                           isFunc { fprintf(yyout, pfCALL pfPUSH, mkfunc(p->value.s)); }
 
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
