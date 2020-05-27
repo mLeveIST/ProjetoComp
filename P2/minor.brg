@@ -278,7 +278,7 @@ static void indexation(char *id, int type)
     fprintf(yyout, pfIMM pfMUL, 1);
 
   if (isLoc)
-    fprintf(yyout, pfLOCV pfSUB, (int) offset->place * 4);
+    fprintf(yyout, pfLOCV pfADD, (int) offset->place * 4);
   else
     fprintf(yyout, pfADDRV pfADD, id);
 }
