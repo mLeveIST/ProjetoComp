@@ -161,16 +161,6 @@ static void pubdcl(int type, char *name)
       externs[i] = 0;
 }
 
-static void numvar(int type, Node *var)
-{
-  if (type & tCNST)
-    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(var)->value.s, RIGHT_CHILD(var)->value.i);
-  else if (RIGHT_CHILD(var)->attrib == NIL)
-    fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(var)->value.s, 4);
-  else if (RIGHT_CHILD(var)->attrib == INT)
-    fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, LEFT_CHILD(var)->value.s, RIGHT_CHILD(var)->value.i);
-}
-
 static int varqualif(int type, char* name)
 {
   int i;
@@ -191,17 +181,7 @@ static int varqualif(int type, char* name)
   return 1;
 }
 
-static void strvar(int type, Node *var)
-{
-  if (type & tCNST)
-    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfID, LEFT_CHILD(var)->value.s, mklbl(RIGHT_CHILD(var)->place));
-  else if (RIGHT_CHILD(var)->attrib == NIL)
-    fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, LEFT_CHILD(var)->value.s, pfWORD);
-  else if (RIGHT_CHILD(var)->attrib != NIL)
-    fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, LEFT_CHILD(var)->value.s, mklbl(RIGHT_CHILD(var)->place));
-}
-
-static void arrvar(Node *id, int arrlbl)
+static void numvar(Node *id, int init)
 {
   int type = id->info;
   char *name = id->value.s;
@@ -210,11 +190,27 @@ static void arrvar(Node *id, int arrlbl)
     return;
 
   if (type & tCNST)
-    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
-  else if (arrlbl == -1)
+    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfINTEGER, name, init);
+  else if (init == -1)
+    fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, name, 4);
+  else
+    fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, name, init);
+}
+
+static void ptrvar(Node *id, int ptrlbl)
+{
+  int type = id->info;
+  char *name = id->value.s;
+
+  if (!varqualif(type, name))
+    return;
+
+  if (type & tCNST)
+    fprintf(yyout, pfRODATA pfALIGN pfLABEL pfID, name, mklbl(ptrlbl));
+  else if (ptrlbl == -1) 
     fprintf(yyout, pfBSS pfALIGN pfLABEL pfBYTE, name, pfWORD);
   else
-    fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, name, mklbl(arrlbl));
+    fprintf(yyout, pfDATA pfALIGN pfLABEL pfID, name, mklbl(ptrlbl));
 }
 
 static void initarr(int dim, int inited)
@@ -231,32 +227,6 @@ static void initlcarr()
   {
     fprintf(yyout, pfLOCAL pfLOCA, (lcarr[lcarrp] * 4) + 4, lcarr[lcarrp] * 4);
     --lcarrp;
-    /* Init elements with 0 ??? */
-  }
-}
-
-static void testvar(int type, Node *var)
-{
-  if (type & tFWD)
-  {
-    externs[extcnt++] = strdup(LEFT_CHILD(var)->value.s);
-    return;
-  }
-
-  pubdcl(type, LEFT_CHILD(var)->value.s);
-
-  switch (var->attrib)
-  {
-    case NUMBER:
-      numvar(type, var);
-      break;
-    case STRING:
-      strvar(type, var);
-      break;
-    case ARRAY:
-      break;
-    default:
-      break;
   }
 }
 
@@ -374,7 +344,7 @@ gdecls: NIL                             1 { /**/ }
 gdecls: DECL(gdecls, decl)              1 { argcnt = 0; lcvarcnt = 0; }
 
 decl: NIL                                                 1 { /**/ }
-decl: VAR(vardecl)                                        1 { testvar(p->info, LEFT_CHILD(p)); }
+decl: VAR(vardecl)                                        1 { /**/ }
 decl: FUNCTION(fend, FARGS(fargs, body))                  1 { IDpop(); }
 decl: FUNCTION(fend, FARGS(fargs, body))              isPub { testfunc(p->info, LEFT_CHILD(p)); IDpop(); }
 
@@ -393,11 +363,12 @@ fvar: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, -(lcva
 fvars: NIL                              1 { imut = 1; }
 fvars: ARGS(fvars, fvar)                1 { /**/ }
 
-vardecl: NUMBER(ID, NIL)                1 { /**/ }
-vardecl: NUMBER(ID, INT)                1 { /**/ }
-vardecl: STRING(ID, NIL)                1 { /**/ }
-vardecl: STRING(vid, chars)             1 { fprintf(yyout, pfCHAR, 0); }
-vardecl: ARRAY(vid, array)              1 { arrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
+vardecl: NUMBER(ID, NIL)                1 { numvar(LEFT_CHILD(p), -1); }
+vardecl: NUMBER(ID, INT)                1 { numvar(LEFT_CHILD(p), RIGHT_CHILD(p)->value.i); }
+vardecl: STRING(ID, NIL)                1 { ptrvar(LEFT_CHILD(p), -1); }
+vardecl: STRING(vid, chars)             1 { fprintf(yyout, pfCHAR, 0);
+                                            ptrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
+vardecl: ARRAY(vid, array)              1 { ptrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
 
 vid: ID                            isnCst { imut = 0; }
 vid: ID                             isCst { imut = 1; }
