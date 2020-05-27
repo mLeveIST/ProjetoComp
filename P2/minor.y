@@ -307,7 +307,8 @@ static void isCte(Node *n) {
   IDnew(type, name, init);
   n->SUB(0)->SUB(0)->info = type;
 
-  if ((type & tCNST) && (type & tFWD) == 0 && init->attrib == NIL) {
+  if ((type & tCNST) && (type & tFWD) == 0 && (init->attrib == NIL ||
+      (init->attrib == INTS && init->SUB(0)->value.i == 0 && init->SUB(1)->attrib == NIL))) {
     sprintf(errstr, "constant values must be initialized for '%s'", name);
     yyerror(errstr);
   }
