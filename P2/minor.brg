@@ -50,6 +50,10 @@ static int rlbl = -1; /* Top of useful rlb stack */
 static int slb[60]; /* Stack for for loop stop labels */
 static int slbl = -1; /* Top of useful slb stack */
 
+static int lcarr[20];
+static int lcarrdim[20];
+static int lcarrp = -1;
+
 static char *externs[100];
 static int extcnt;
 
@@ -219,6 +223,16 @@ static void initarr(int dim, int inited)
     fprintf(yyout, pfINTEGER, 0);
 }
 
+static void initlcarr()
+{
+  while (lcarrp >= 0 && lcarrdim[lcarrp] != 0)
+  {
+    fprintf(yyout, pfLOCAL pfLOCA, (lcarr[lcarrp] * 4) + 4, lcarr[lcarrp] * 4);
+    --lcarrp;
+    /* Init elements with 0 ??? */
+  }
+}
+
 static void testvar(int type, Node *var)
 {
   if (type & tFWD)
@@ -348,8 +362,8 @@ fargs: ARGS(fargs, farg)                1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
 fvar: STRING(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
-fvar: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, -(++lcvarcnt));
-                                            lcvarcnt += LEFT_CHILD(RIGHT_CHILD(p))->value.i; }
+fvar: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, -(lcvarcnt += (LEFT_CHILD(RIGHT_CHILD(p))->value.i + 1)));
+                                            lcarr[++lcarrp] = -lcvarcnt; lcarrdim[lcarrp] = LEFT_CHILD(RIGHT_CHILD(p))->value.i; }
 
 fvars: NIL                              1 { imut = 1; }
 fvars: ARGS(fvars, fvar)                1 { /**/ }
@@ -385,7 +399,7 @@ ints: INTS(ints, INT)                   1 { fprintf(yyout, pfINTEGER, RIGHT_CHIL
 
 main: START(mvarsb, instrs)             1 { lcvarcnt = 0; }
 
-mvarsb: mvars                           1 { fprintf(yyout, pfENTER, lcvarcnt * 4); }
+mvarsb: mvars                           1 { fprintf(yyout, pfENTER, lcvarcnt * 4); initlcarr(); }
 
 mvars: NIL                              1 { fprintf(yyout, pfTEXT pfALIGN pfGLOBL pfLABEL, "_main", pfFUNC, "_main");
                                             imut = 1; }
