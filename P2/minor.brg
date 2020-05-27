@@ -316,13 +316,27 @@ static void vectoradd(char *id)
 {
   Node *offset;
 
+  fprintf(yyout, pfIMM pfMUL, pfWORD);
+
   if (IDfind(id, (void**) &offset) == -1)
     fprintf(yyout, pfLOCV pfADD, (int) offset->place * 4);
   else
     fprintf(yyout, pfADDRV pfADD, id);
 }
 
-static void vectorsub(char *id1, char *id2)
+static void vectorsub(char *id)
+{
+  Node *offset;
+
+  fprintf(yyout, pfIMM pfMUL, pfWORD);
+
+  if (IDfind(id, (void**) &offset) == -1)
+    fprintf(yyout, pfLOCV pfSUB, (int) offset->place * 4);
+  else
+    fprintf(yyout, pfADDRV pfSUB, id);
+}
+
+static void vectorsub2(char *id1, char *id2)
 {
   Node *offset;
 
@@ -490,7 +504,11 @@ expr: ADD(expr, expr)            isArgInt { fprintf(yyout, pfADD); }
 expr: ADD(ID, expr)              isLftVec { vectoradd(LEFT_CHILD(p)->value.s); }
 expr: ADD(expr, ID)              isRgtVec { vectoradd(RIGHT_CHILD(p)->value.s); }
 expr: SUB(expr, expr)            isArgInt { fprintf(yyout, pfSUB); }
-expr: SUB(ID, ID)                isArgVec { vectorsub(LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.s); }
+expr: SUB(subid, expr)           isLftVec { fprintf(yyout, pfIMM pfMUL pfSUB, pfWORD); }
+subid: ID                           isGlb { fprintf(yyout, pfADDRV, p->value.s); }
+subid: ID                           isLoc { fprintf(yyout, pfLOCV, getoffset(p->value.s) * 4); }
+expr: SUB(expr, ID)              isRgtVec { vectorsub(RIGHT_CHILD(p)->value.s); }
+expr: SUB(ID, ID)                isArgVec { vectorsub2(LEFT_CHILD(p)->value.s, RIGHT_CHILD(p)->value.s); }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
