@@ -98,6 +98,7 @@ static char *mkslbl(int n) { return mklbl(slb[++slbl] = n); }
 
 static int isResInt(Node *n) { return tTYPE(n->info) == tINT ? 1 : 1000; }
 static int isResStr(Node *n) { return tTYPE(n->info) == tSTR ? 1 : 1000; }
+static int isResVec(Node *n) { return tTYPE(n->info) == tVEC ? 1 : 1000; }
 
 static int isArgInt(Node *n)
 {
@@ -109,7 +110,10 @@ static int isArgStr(Node *n)
   return (tTYPE(LEFT_CHILD(n)->info) == tSTR && tTYPE(RIGHT_CHILD(n)->info) == tSTR) ? 1 : 1000;
 }
 
-static int isVec(Node *n) { return tTYPE(n->info) == tVEC ? 1 : 1000; }
+static int isArgVec(Node *n)
+{
+  return (tTYPE(LEFT_CHILD(n)->info) == tVEC || tTYPE(RIGHT_CHILD(n)->info) == tVEC) ? 1 : 1000;
+}
 
 static int isLeftInt(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tINT ? 1 : 1000; }
 static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 1000; }
@@ -272,7 +276,7 @@ static void indexation(char *id, int type)
   Node *offset;
   int isLoc = IDfind(id, (void**) &offset) == -1;
 
-  if (tTYPE(type) == tINT)
+  if (tTYPE(type) == tVEC)
     fprintf(yyout, pfIMM pfMUL, pfWORD);
   else if (tTYPE(type) == tSTR)
     fprintf(yyout, pfIMM pfMUL, 1);
@@ -285,7 +289,7 @@ static void indexation(char *id, int type)
 
 static void association(int type)
 {
-  if (tTYPE(type) == tINT)
+  if (tTYPE(type) == tVEC)
     fprintf(yyout, pfSTORE);
   else if (tTYPE(type) == tSTR)
     fprintf(yyout, pfSTCHR);
@@ -296,7 +300,7 @@ static void allocation(char *id, int type)
   Node *offset;
   int isLoc = IDfind(id, (void**) &offset) == -1;
 
-  if (tTYPE(type) == tINT)
+  if (tTYPE(type) == tVEC)
     fprintf(yyout, pfIMM, pfWORD);
   else if (tTYPE(type) == tSTR)
     fprintf(yyout, pfIMM, 1);
@@ -446,7 +450,6 @@ instr: PRINT(expr)              isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH
 instr: ALLOC(expr, ID)                  1 { allocation(RIGHT_CHILD(p)->value.s, RIGHT_CHILD(p)->info); }
 
 instr: expr                             1 { fprintf(yyout, pfTRASH, 4); }
-instr: vexpr                            1 { /**/ }
 
 ichars: chars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, mklbl(p->place)); }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
@@ -461,8 +464,11 @@ exprval: expr                           1 { fprintf(yyout, pfDUP); }
 expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
+expr: ADDR(lval)                        1 { /**/ }
 expr: ADD(expr, expr)            isArgInt { fprintf(yyout, pfADD); }
+expr: ADD(expr, expr)            isArgVec { /**/ }
 expr: SUB(expr, expr)            isArgInt { fprintf(yyout, pfSUB); }
+expr: SUB(expr, expr)            isArgVec { /**/ }
 expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
@@ -491,16 +497,8 @@ expr: CALL(ID, exprs)            isResInt { /**/ }
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
-vexpr: lval                             1 { /**/ }
-vexpr: ADDR(lval)                       1 { /**/ }
-vexpr: ADD(expr, vexpr)             isVec { /**/ }
-vexpr: SUB(vexpr, vexpr)            isVec { /**/ }
-vexpr: ASSOC(vexpr, lval)           isVec { /**/ }
-vexpr: CALL(ID, exprs)              isVec { /**/ }
-
 exprs: NIL                              1 { /**/ }
 exprs: PARAMS(expr, exprs)              1 { /**/ }
-exprs: PARAMS(vexpr, exprs)             1 { /**/ }
 
 %%
 
