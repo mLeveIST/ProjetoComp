@@ -1,7 +1,7 @@
 %{
 
 /* -----------------------------------------
- * Compiladores 19/20 - Entrega Final
+ * Compiladores 19/20 - Entrega Final (Melhoria)
  * Author: Miguel Levezinho, No 90756
  * -----------------------------------------
  */
@@ -253,6 +253,13 @@ static void testfunc(int type, Node *var)
   fprintf(yyout, pfTEXT pfALIGN pfLABEL pfENTER, mkfunc(LEFT_CHILD(var)->value.s), lcvarcnt * 4);
 }
 
+static void newid(char *id, int offset)
+{
+  Node *aux = nilNode(VOID);
+  aux->place = offset;
+  IDnew(-1, id, aux);
+}
+
 static int getoffset(char *id)
 {
   Node *aux;
@@ -260,11 +267,46 @@ static int getoffset(char *id)
   return aux->place;
 }
 
-static void newid(char *id, int offset)
+static void indexation(char *id, int type)
 {
-  Node *aux = nilNode(VOID);
-  aux->place = offset;
-  IDnew(-1, id, aux);
+  Node *offset;
+  int isLoc = IDfind(id, (void**) &offset) == -1;
+
+  if (tTYPE(type) == tINT)
+    fprintf(yyout, pfIMM pfMUL, pfWORD);
+  else if (tTYPE(type) == tSTR)
+    fprintf(yyout, pfIMM pfMUL, 1);
+
+  if (isLoc)
+    fprintf(yyout, pfLOCV pfSUB, (int) offset->place * 4);
+  else
+    fprintf(yyout, pfADDRV pfADD, id);
+}
+
+static void association(int type)
+{
+  if (tTYPE(type) == tINT)
+    fprintf(yyout, pfSTORE);
+  else if (tTYPE(type) == tSTR)
+    fprintf(yyout, pfSTCHR);
+}
+
+static void allocation(char *id, int type)
+{
+  Node *offset;
+  int isLoc = IDfind(id, (void**) &offset) == -1;
+
+  if (tTYPE(type) == tINT)
+    fprintf(yyout, pfIMM, pfWORD);
+  else if (tTYPE(type) == tSTR)
+    fprintf(yyout, pfIMM, 1);
+
+  fprintf(yyout, pfMUL pfALLOC pfSP);
+
+  if (isLoc)
+    fprintf(yyout, pfLOCA, (int) offset->place * 4);
+  else
+    fprintf(yyout, pfADDRA, id);
 }
 
 %}
@@ -361,6 +403,7 @@ block: STMT(instrs, STOP)               1 { fprintf(yyout, pfJMP, mkslbl(p->plac
 instrs: NIL                             1 { /**/ }
 instrs: STMT(instrs, instr)             1 { /**/ }
 
+
 %! /* For loop code selection and generation */
 
 instr : FOR(fblock, UNTIL(uexpr, expr))  1 { fprintf(yyout, pfJZ, mklbl(LEFT_CHILD(LEFT_CHILD(p))->place));
@@ -373,6 +416,7 @@ fexpr : instr                            1 { fprintf(yyout, pfJMP, mkflbl(++lbl)
                                              rlb[++rlbl] = 0; slb[++slbl] = 0; }
 
 uexpr : instr                            1 { fprintf(yyout, pfLABEL, mklbl(flb[flbl--])); }
+
 
 %! /* If elif else conditions code selection and generation */
 
@@ -390,24 +434,27 @@ elifsi : elifs                           1 { --elbl; }
 elifs : NIL                              1 { /**/ }
 elifs : ELIF(elifs, IF(ifexpr, block))   1 { fprintf(yyout, pfJMP pfLABEL, mklbl(elb[elbl]), mklbl(LEFT_CHILD(RIGHT_CHILD(p))->place)); }
 
-%! /* Other instructions code selection and generation */
+
+%! /* Print code selection and generation */
 
 instr: PRINT(expr)              isLeftInt { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_printi", 4, "_printi"); }
 instr: PRINT(expr)              isLeftStr { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_prints", pfWORD, "_prints"); }
+
+
+%! /* Allocation code selection and generation */
+
+instr: ALLOC(expr, ID)                  1 { allocation(RIGHT_CHILD(p)->value.s, RIGHT_CHILD(p)->info); }
+
 instr: expr                             1 { fprintf(yyout, pfTRASH, 4); }
 instr: vexpr                            1 { /**/ }
-
-instr: ALLOC(alloc, lval)               1 { fprintf(yyout, pfSTORE); }
-alloc: expr                             1 { fprintf(yyout, pfIMM pfMUL pfALLOC pfSP, pfWORD); }
 
 ichars: chars                           1 { fprintf(yyout, pfCHAR pfTEXT pfALIGN pfADDR, 0, mklbl(p->place)); }  
 ichars: CHARS(NIL, INT)                 1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)->value.i); }
 
-lval: ID                           isGlb { fprintf(yyout, pfADDR, p->value.s); }
-lval: ID                           isLoc { fprintf(yyout, pfLOCAL, getoffset(p->value.s) * 4); }
-lval: INDEX(expr, ID)         isRightGlb { fprintf(yyout, pfIMM pfMUL pfADDRV pfADD, pfWORD, RIGHT_CHILD(p)->value.s); }
-lval: INDEX(expr, ID)         isRightLoc { fprintf(yyout, pfIMM pfMUL pfLOCAL pfADD, pfWORD * -1, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
+lval: ID                            isGlb { fprintf(yyout, pfADDR, p->value.s); }
+lval: ID                            isLoc { fprintf(yyout, pfLOCAL, getoffset(p->value.s) * 4); }
+lval: INDEX(expr, ID)                   1 { indexation(RIGHT_CHILD(p)->value.s, RIGHT_CHILD(p)->info); }
 
 exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
@@ -436,17 +483,19 @@ expr: AND(and, expr)                    1 { fprintf(yyout, pfLABEL, mklbl(LEFT_C
 expr: OR(or, expr)                      1 { fprintf(yyout, pfLABEL, mklbl(LEFT_CHILD(p)->place)); }
 expr: NOT(expr)                         1 { fprintf(yyout, pfIMM pfEQ, 0); }
 expr: UMINUS(expr)                      1 { fprintf(yyout, pfNEG); }
-expr: ASSOC(exprval, lval)       isArgInt { fprintf(yyout, pfSTORE); }
+expr: ASSOC(exprval, ID)       isRightGlb { fprintf(yyout, pfADDRA, RIGHT_CHILD(p)->value.s); }
+expr: ASSOC(exprval, ID)       isRightLoc { fprintf(yyout, pfLOCA, getoffset(RIGHT_CHILD(p)->value.s) * 4); }
+expr: ASSOC(exprval, lval)              1 { association(RIGHT_CHILD(RIGHT_CHILD(p))->info); }
 expr: CALL(ID, exprs)            isResInt { /**/ }
 
 and: expr                               1 { fprintf(yyout, pfDUP pfJZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, mklbl(p->place = ++lbl), pfWORD); }
 
-vexpr: lval                              1 { /**/ }
-vexpr: ADDR(lval)                        1 { /**/ }
+vexpr: lval                             1 { /**/ }
+vexpr: ADDR(lval)                       1 { /**/ }
 vexpr: ADD(expr, vexpr)             isVec { /**/ }
 vexpr: SUB(vexpr, vexpr)            isVec { /**/ }
-vexpr: ASSOC(vexpr, lval)            isVec { /**/ }
+vexpr: ASSOC(vexpr, lval)           isVec { /**/ }
 vexpr: CALL(ID, exprs)              isVec { /**/ }
 
 exprs: NIL                              1 { /**/ }
