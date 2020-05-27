@@ -125,11 +125,11 @@ static int isLeftStr(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tSTR ? 1 : 
 static int isLftVec(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 static int isRgtVec(Node *n) { return tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 
-static int isPub(Node *n) { return (n->info & tPUB) == 1 ? 1 : 1000; }
-static int isFwd(Node *n) { return (n->info & tFWD) == 1 ? 1 : 1000; }
+static int isPub(Node *n) { return (n->info & tPUB) ? 1 : 1000; }
+static int isFwd(Node *n) { return (n->info & tFWD) ? 1 : 1000; }
 
-static int isCst(Node *n) { return (n->info & tCNST) == 1 ? 1 : 1000; }
-static int isnCst(Node *n) { return (n->info & tCNST) != 1 ? 1 : 1000; }
+static int isCst(Node *n) { return (n->info & tCNST) ? 1 : 1000; }
+static int isnCst(Node *n) { return (n->info & tCNST) == 0 ? 1 : 1000; }
 
 static int isImut(Node *n) { return imut != 0 ? 1 : 1000; }
 static int isnImut(Node *n) { return imut == 0 ? 1 : 1000; }
