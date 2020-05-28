@@ -1,7 +1,5 @@
 program
   function forward number exemplo number n done
 start
-  number n;
-  n := exemplo(?);
-  n !
+  exemplo(?)! "\n"!
 end
