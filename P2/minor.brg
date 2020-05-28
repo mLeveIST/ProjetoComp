@@ -113,15 +113,11 @@ static int isVecL(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(
 static int isVecR(Node *n) { return tTYPE(LEFT_CHILD(n)->info) != tVEC && tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 static int isVecB(Node *n) { return tTYPE(LEFT_CHILD(n)->info) == tVEC && tTYPE(RIGHT_CHILD(n)->info) == tVEC ? 1 : 1000; }
 
+static int isCte(Node *n) { return (n->info & tCNST) ? 1 : 1000; }
+static int isnCte(Node *n) { return (n->info & tCNST) ? 1000 : 1; }
 static int isPub(Node *n) { return (n->info & tPUB) ? 1 : 1000; }
 static int isFwd(Node *n) { return (n->info & tFWD) ? 1 : 1000; }
 static int isFunc(Node *n) { return (n->info & tFUNC) ? 1 : 1000; }
-
-static int setIfCte(Node *n) { imut = (n->info & tCNST); return 0; }
-static int setImut(Node *n) { return !(imut = 1); }
-
-static int isImut(Node *n) { return imut ? 1 : 1000; }
-static int isnImut(Node *n) { return !imut ? 1 : 1000; }
 
 static int isGlb(Node *n) { return IDfind(n->value.s, ((void**) IDtest)) >= 0 ? 1 : 1000; }
 static int isLoc(Node *n) { return IDfind(n->value.s, ((void**) IDtest)) < 0 ? 1 : 1000; }
@@ -348,7 +344,7 @@ farg: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argc
 farg: STRING(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 farg: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 
-fargs: NIL                              1 { argcnt = 1; }
+fargs: NIL                              1 { argcnt = 1; imut = 1; }
 fargs: ARGS(fargs, farg)                1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
@@ -356,7 +352,7 @@ fvar: STRING(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, -(++lc
 fvar: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, -(lcvarcnt += (LEFT_CHILD(RIGHT_CHILD(p))->value.i + 1)));
                                             lcarr[++lcarrp] = -lcvarcnt; lcarrdim[lcarrp] = LEFT_CHILD(RIGHT_CHILD(p))->value.i; }
 
-fvars: NIL                        setImut { lcvarcnt = 0; }
+fvars: NIL                              1 { lcvarcnt = 0; }
 fvars: ARGS(fvars, fvar)                1 {  }
 
 vardecl: NUMBER(ID, NIL)                1 { numvar(LEFT_CHILD(p), -1); }
@@ -366,23 +362,23 @@ vardecl: STRING(vid, chars)             1 { fprintf(yyout, pfCHAR, 0);
                                             ptrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
 vardecl: ARRAY(vid, array)              1 { ptrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
 
-vid: ID                          setIfCte { /**/ }
+vid: ID                             isCte { imut = 1; }
+vid: ID                            isnCte { imut = 0; }
 
-chars: NIL                         isImut { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
-chars: NIL                        isnImut { fprintf(yyout, pfDATA pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
+chars: NIL                              1 { fprintf(yyout, imut ? pfRODATA : pfDATA);
+                                            fprintf(yyout, pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
 chars: CHARS(chars, char)               1 { p->place = LEFT_CHILD(p)->place; }
 
 char: INT                               1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
 char: CHAR                              1 { fprintf(yyout, pfCHAR, (unsigned char) p->value.i); }
 char: STR                               1 { litstr(p->value.s); }
 
-array: INTS(INT, NIL)              isImut { p->place = initarr(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info, 1); }
-array: INTS(INT, NIL)             isnImut { p->place = initarr(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info, 0); }
+array: INTS(INT, NIL)                   1 { p->place = initarr(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info, imut); }
 array: INTS(INT, ints)                  1 { initarr(LEFT_CHILD(p)->value.i, RIGHT_CHILD(p)->info, 0);
                                             p->place = RIGHT_CHILD(p)->place; }
 
-ints: INT                          isImut { fprintf(yyout, pfRODATA pfALIGN pfLABEL pfINTEGER, mklbl(p->place = ++lbl), p->value.i); }
-ints: INT                         isnImut { fprintf(yyout, pfDATA pfALIGN pfLABEL pfINTEGER, mklbl(p->place = ++lbl), p->value.i); }
+ints: INT                               1 { fprintf(yyout, imut ? pfRODATA : pfDATA);
+                                            fprintf(yyout, pfALIGN pfLABEL pfINTEGER, mklbl(p->place = ++lbl), p->value.i); }
 ints: INTS(ints, INT)                   1 { fprintf(yyout, pfINTEGER, RIGHT_CHILD(p)->value.i);
                                             p->place = LEFT_CHILD(p)->place; }
 
