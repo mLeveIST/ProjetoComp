@@ -1,0 +1,6 @@
+program
+  number n
+start
+  if 1 ? 2 : 3 ! "\n"!
+  if 0 ? 2 : 3 ! "\n"!
+end

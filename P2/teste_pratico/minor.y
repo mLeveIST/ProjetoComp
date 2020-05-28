@@ -31,7 +31,7 @@ static int ret, cycle;
 %type<n> ints eqbody body ret loop instrs
 %type<n> instr elifs else expr exprs block main
 
-%token FARGS CHARS INTS ADDR VAR ARGS DECL NIL FBLOCK
+%token FARGS CHARS INTS ADDR VAR ARGS DECL NIL FBLOCK TERN ALT
 
 %right ASSOC
 %left '|'
@@ -230,6 +230,8 @@ expr : chars                        { $$ = $1; }
                                       $$->info = isAddr($$); }
      | '(' expr ')'                 { $$ = $2;
                                       $$->info = $2->info; }
+     | IF expr '?' expr ':' expr    { $$ = binNode(TERN, $2, binNode(ALT, $4, $6));
+                                      $$->info = $4->info; }
      | expr '+' expr                { $$ = binNode('+', $1, $3);
                                       $$->info = isAddSub($$, "+"); }
      | expr '-' expr                { $$ = binNode('-', $1, $3);

@@ -1,3 +1,4 @@
+
 %{
 
 /* -----------------------------------------
@@ -417,7 +418,6 @@ fexpr : instr                            1 { fprintf(yyout, pfJMP, mkflbl(++lbl)
 
 uexpr : instr                            1 { fprintf(yyout, pfLABEL, mklbl(flb[flbl--])); }
 
-
 %! /* If elif else conditions code selection and generation */
 
 instr : FI(THEN(ifb, NIL), NIL)          1 { /**/ }
@@ -490,6 +490,14 @@ or: expr                                1 { fprintf(yyout, pfDUP pfJNZ pfTRASH, 
 
 exprs: NIL                              1 { argcnt = 0; }
 exprs: PARAMS(expr, exprs)              1 { argcnt++; }
+
+%! /* Ternary if condition code selection and generation */
+
+expr : TERN(texpr, ALT(ttexpr, expr))   1 { fprintf(yyout, pfLABEL, mklbl(++lbl)); }
+
+texpr : expr                             1 { fprintf(yyout, pfJZ, mklbl(++lbl)); }
+
+ttexpr : expr                            1 { fprintf(yyout, pfJMP pfLABEL, mklbl(lbl + 1), mklbl(lbl)); }
 
 
 %! /* String comparisons code selection and generation */
