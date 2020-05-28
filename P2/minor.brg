@@ -117,13 +117,8 @@ static int isPub(Node *n) { return (n->info & tPUB) ? 1 : 1000; }
 static int isFwd(Node *n) { return (n->info & tFWD) ? 1 : 1000; }
 static int isFunc(Node *n) { return (n->info & tFUNC) ? 1 : 1000; }
 
-static int setImut(Node *n)
-{
-  if (n->info != -1)
-    imut = (n->info & tCNST);
-
-  return 1;
-}
+static int setIfCte(Node *n) { imut = (n->info & tCNST); return 0; }
+static int setImut(Node *n) { return !(imut = 1); }
 
 static int isImut(Node *n) { return imut ? 1 : 1000; }
 static int isnImut(Node *n) { return !imut ? 1 : 1000; }
@@ -353,7 +348,7 @@ farg: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argc
 farg: STRING(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 farg: ARRAY(ID, INTS(INT, NIL))         1 { newid(LEFT_CHILD(p)->value.s, ++argcnt); }
 
-fargs: NIL                        setImut { argcnt = 1; }
+fargs: NIL                              1 { argcnt = 1; }
 fargs: ARGS(fargs, farg)                1 { /**/ }
 
 fvar: NUMBER(ID, NIL)                   1 { newid(LEFT_CHILD(p)->value.s, -(++lcvarcnt)); }
@@ -371,7 +366,7 @@ vardecl: STRING(vid, chars)             1 { fprintf(yyout, pfCHAR, 0);
                                             ptrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
 vardecl: ARRAY(vid, array)              1 { ptrvar(LEFT_CHILD(p), RIGHT_CHILD(p)->place); }
 
-vid: ID                           setImut { /**/ }
+vid: ID                          setIfCte { /**/ }
 
 chars: NIL                         isImut { fprintf(yyout, pfRODATA pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
 chars: NIL                        isnImut { fprintf(yyout, pfDATA pfALIGN pfLABEL, mklbl(p->place = ++lbl)); }
