@@ -14,4 +14,4 @@ exemplo.asm:
 	nasm -felf32 $< -o $@
 
 clean::
-	rm -f libminor.a *.o expr.asm a.out core
+	rm -f libminor.a *.o expr.asm a.out exemplo.asm core
