@@ -468,6 +468,7 @@ expr: MULT(expr, expr)                  1 { fprintf(yyout, pfMUL); }
 expr: DIV(expr, expr)                   1 { fprintf(yyout, pfDIV); }
 expr: MOD(expr, expr)                   1 { fprintf(yyout, pfMOD); }
 expr: POW(expr, expr)                   1 { fprintf(yyout, pfCALL pfTRASH pfPUSH pfEXTRN, "_power", 8, "_power"); }
+expr: XOR(expr, expr)                   1 { fprintf(yyout, pfXOR); }
 expr: EQ(expr, expr)               isIntB { fprintf(yyout, pfEQ); }
 expr: NE(expr, expr)               isIntB { fprintf(yyout, pfNE); }
 expr: GE(expr, expr)               isIntB { fprintf(yyout, pfGE); }

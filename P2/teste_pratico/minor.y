@@ -41,6 +41,7 @@ static int ret, cycle;
 %left '<' '>' GE LE
 %left '+' '-'
 %left '*' '/' '%'
+%right XOR
 %right '^'
 %nonassoc UMINUS
 
@@ -239,6 +240,8 @@ expr : chars                        { $$ = $1; }
                                       $$->info = isInt($$, "/"); }
      | expr '%' expr                { $$ = binNode('%', $1, $3);
                                       $$->info = isInt($$, "%"); }
+     | expr XOR expr                { $$ = binNode(XOR, $1, $3);
+                                      $$->info = isInt($$, "xor"); }
      | expr '^' expr                { $$ = binNode('^', $3, $1);
                                       $$->info = isInt($$, "^"); }
      | expr '=' expr                { $$ = binNode('=', $1, $3);

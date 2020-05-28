@@ -27,6 +27,7 @@ H [A-Fa-f0-9]
 
 <CODE>{
 
+"xor"             return XOR;
 "<="              return LE;
 ">="              return GE;
 "~="              return NE;
