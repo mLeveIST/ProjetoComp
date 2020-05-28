@@ -144,7 +144,7 @@ static int qualifs(int type, char* name)
 
   if (type & tFWD)
   {
-    externs[extcnt++] = strdup(name);
+    externs[extcnt++] = strdup(mkfunc(name));
     return 0;
   }
 
@@ -157,7 +157,7 @@ static int qualifs(int type, char* name)
   }
 
   for (i = 0; i < extcnt; i++)
-    if (externs[i] && strcmp(externs[i], name) == 0)
+    if (externs[i] && strcmp(externs[i], mkfunc(name)) == 0)
       externs[i] = 0;
 
   return 1;
