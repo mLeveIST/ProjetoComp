@@ -254,11 +254,9 @@ static void indexation(char *id, int type)
     fprintf(yyout, pfIMM pfMUL, 1);
 
   if (IDfind(id, (void**) &offset) == -1)
-    fprintf(yyout, tTYPE(type) == tSTR ? pfLOCAL pfLDCHR : pfLOCV, (int) offset->place * 4);
+    fprintf(yyout, pfLOCV pfADD, (int) offset->place * 4);
   else
-    fprintf(yyout, tTYPE(type) == tSTR ? pfADDR pfLDCHR : pfADDRV, id);
-
-  fprintf(yyout, pfADD);
+    fprintf(yyout, pfADDRV pfADD, id);
 }
 
 static void association(int type)
@@ -470,6 +468,7 @@ exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
 expr: ichars                            1 { /**/ }
 expr: lval                              1 { fprintf(yyout, pfLOAD); }
+expr: INDEX(expr, ID)                   1 { fprintf(yyout, tTYPE(RIGHT_CHILD(p)->info) == tSTR ? pfLDCHR : pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
 expr: ADDR(lval)                        1 { /**/ }
 expr: ADD(expr, expr)              isIntB { fprintf(yyout, pfADD); }
