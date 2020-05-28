@@ -14,5 +14,4 @@ out:: out.asm minor
 clean::
 	make -C lib clean
 	make -C run clean
-	make -C err clean
 	rm -f *.o minor libminor.a lex.yy.c y.tab.c y.tab.h yyselect.c y.output *.out *.asm *~
