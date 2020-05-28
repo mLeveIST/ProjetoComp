@@ -462,13 +462,13 @@ ichars: CHARS(NIL, CHAR)                1 { fprintf(yyout, pfIMM, RIGHT_CHILD(p)
 
 lval: ID                            isGlb { fprintf(yyout, pfADDR, p->value.s); }
 lval: ID                            isLoc { fprintf(yyout, pfLOCAL, getoffset(p->value.s) * 4); }
-lval: INDEX(expr, ID)                   1 { indexation(RIGHT_CHILD(p)->value.s, RIGHT_CHILD(p)->info); }
+lval: INDEX(expr, ID)                   1 { indexation(RIGHT_CHILD(p)->value.s, RIGHT_CHILD(p)->info);
+                                            p->place = tTYPE(RIGHT_CHILD(p)->info) == tSTR; }
 
 exprval: expr                           1 { fprintf(yyout, pfDUP); }
 
 expr: ichars                            1 { /**/ }
-expr: lval                              1 { fprintf(yyout, pfLOAD); }
-expr: INDEX(expr, ID)                   1 { fprintf(yyout, tTYPE(RIGHT_CHILD(p)->info) == tSTR ? pfLDCHR : pfLOAD); }
+expr: lval                              1 { fprintf(yyout, p->place == 1 ? pfLDCHR : pfLOAD); }
 expr: READ                              1 { fprintf(yyout, pfCALL pfPUSH pfEXTRN, "_readi", "_readi"); }
 expr: ADDR(lval)                        1 { /**/ }
 expr: ADD(expr, expr)              isIntB { fprintf(yyout, pfADD); }
